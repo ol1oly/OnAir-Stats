@@ -6,10 +6,10 @@ Derived from `plan.md`. Each task is atomic, completable in under 2 hours, and o
 
 ## Day 1 — Backend Pipeline
 
-### SETUP
+### SETUP DONE
 
 - [ ] **SETUP-01** — Create repo structure: `backend/`, `frontend/`, `.env`, `.env.example`, `README.md`
-- [ ] **SETUP-02** — Create `backend/requirements.txt` with: `fastapi`, `uvicorn`, `websockets`, `deepgram-sdk`, `anthropic`, `httpx`, `python-dotenv`, `rapidfuzz`
+- [ ] **SETUP-02** — Create `backend/requirements.txt` with: `fastapi[standard]`, `uvicorn`, `websockets`, `deepgram-sdk`, `anthropic`, `httpx`, `python-dotenv`, `rapidfuzz` , `google-genai`
 - [ ] **SETUP-03** — Run `pip install -r requirements.txt`, verify all imports resolve
 - [ ] **SETUP-04** — Create `.env.example` with `DEEPGRAM_API_KEY=` and `ANTHROPIC_API_KEY=` placeholders; create `.env` with real keys; add `.env` to `.gitignore`
 - [ ] **SETUP-05** — Scaffold `frontend/` with Vite + React + TypeScript: `npm create vite@latest frontend -- --template react-ts`
@@ -30,10 +30,10 @@ Derived from `plan.md`. Each task is atomic, completable in under 2 hours, and o
 
 ---
 
-### TRANSCRIPTION — `backend/transcriber.py`
+### TRANSCRIPTION — `backend/transcriber.py` DONE
 
 - [ ] **TRANS-01** — Implement `DeepgramTranscriber` class that accepts a Deepgram API key and an `on_transcript(text: str, is_final: bool)` callback
-- [ ] **TRANS-02** — Connect Deepgram WebSocket using the SDK's `listen.live` interface with `model="nova-2"`, `language="en"`, `punctuate=True`
+- [ ] **TRANS-02** — Connect Deepgram WebSocket using the SDK's `listen.live` interface with `model="nova-2"`, `language="en"`, `punctuate=True`. refer to the deepgram skill
 - [ ] **TRANS-03** — Implement `send_audio(blob: bytes)` method that pipes raw audio blobs from the browser directly to the open Deepgram WebSocket
 - [ ] **TRANS-04** — Confirm final transcripts print to terminal within 1 second of speech arriving at the backend
 
@@ -49,17 +49,17 @@ Derived from `plan.md`. Each task is atomic, completable in under 2 hours, and o
   - Call `anthropic.Anthropic().messages.create()` with the system prompt and transcript as user message
   - Strip markdown fences if present, `json.loads()` the response, validate keys `"players"` and `"teams"` exist
   - Catch all exceptions; return `{ "players": [], "teams": [] }` on any failure
-- [ ] **EXTR-04** — **"fuzzy" mode — player matching**
+- [ ] **EXTR-04** — **"fuzzy" mode — player matching** DONE
   - Generate n-grams (1–3 words) from the transcript
   - Match each n-gram against keys in `players.json` using RapidFuzz (`scorer=fuzz.token_sort_ratio`, threshold >= 85)
   - Return matched canonical full player names, deduplicated
-- [ ] **EXTR-05** — **"fuzzy" mode — team matching**
+- [ ] **EXTR-05** — **"fuzzy" mode — team matching** DONE
   - Load `teams.json` (including short aliases: `"Oilers"`, `"Leafs"`, `"Habs"`, etc.)
   - Apply same n-gram + RapidFuzz approach (threshold >= 85) against all keys
   - Resolve matched alias to canonical team name (e.g., `"Oilers"` -> `"Edmonton Oilers"`)
   - Return matched canonical team names, deduplicated
 - [ ] **EXTR-06** — **Consistency check**: ensure both modes return the same shape `{ "players": List[str], "teams": List[str] }` with full canonical names; add a `normalize()` helper if needed
-- [ ] **EXTR-07** — **Unit tests** with 6 sample transcripts:
+- [ ] **EXTR-07** — **Unit tests** with 6 sample transcripts: DONE
   - 2 with clear player name(s) only
   - 2 with clear team name(s) only (including a short alias like "the Leafs")
   - 1 with both player and team mentioned
@@ -72,8 +72,8 @@ Derived from `plan.md`. Each task is atomic, completable in under 2 hours, and o
 
 Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 
-- [ ] **STATS-01** — **`players.json`**: seed with 50 top NHL players as `{ "Full Name": player_id }` using the NHL API player search or a known list
-- [ ] **STATS-02** — **`teams.json`**: create mapping for all 32 NHL teams including common short aliases:
+- [ ] **STATS-01** — **`players.json`**: seed with 50 top NHL players as `{ "Full Name": player_id }` using the NHL API player search or a known list DONE
+- [ ] **STATS-02** — **`teams.json`**: create mapping for all 32 NHL teams including common short aliases: DONE
   ```json
   {
     "Edmonton Oilers": "EDM",
@@ -84,8 +84,8 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
     "Habs": "MTL"
   }
   ```
-- [ ] **STATS-03** — Implement `lookup_player_id(name: str) -> int | None` with case-insensitive match against `players.json`
-- [ ] **STATS-04** — Implement `lookup_team_abbrev(name: str) -> str | None` with case-insensitive match against `teams.json`; resolves aliases to abbreviation
+- [ ] **STATS-03** — Implement `lookup_player_id(name: str) -> int | None` with case-insensitive match against `players.json` DONE
+- [ ] **STATS-04** — Implement `lookup_team_abbrev(name: str) -> str | None` with case-insensitive match against `teams.json`; resolves aliases to abbreviation DONE
 - [ ] **STATS-05** — Implement `fetch_player_stats(player_id: int) -> dict | None` using `httpx.AsyncClient`:
   - Call `GET https://api-web.nhle.com/v1/player/{id}/landing`
   - Extract `{ goals, assists, points, plus_minus }` from current season
@@ -94,9 +94,9 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
   - Call `GET https://api-web.nhle.com/v1/standings/now`
   - Filter standings list by `teamAbbrev` field
   - Extract `{ wins, losses, ot_losses, points, goals_for, goals_against }`
-- [ ] **STATS-07** — Implement 45-second in-memory cache shared by both players and teams:
+- [ ] **STATS-07** — Implement 120-second in-memory cache shared by both players and teams:
   - Structure: `dict[str, (float, dict)]` keyed by player_id (as string) or team abbreviation
-  - Check `time.time() - timestamp < 45` before fetching
+  - Check `time.time() - timestamp < 120` before fetching
   - Cache the full standings response as a single entry (key `"standings"`) to avoid 32 separate requests
 - [ ] **STATS-08** — Implement `build_player_payload(name: str, stats: dict) -> dict` returning:
   `{ "type": "player", "player": name, "stats": {...}, "display": "McDavid · 32G  100A  132PTS  +15" }`
@@ -109,10 +109,10 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 
 ### SERVER — `backend/server.py`
 
-- [ ] **SERV-01** — Create FastAPI app with `GET /` that serves `frontend/dist/index.html` (use `StaticFiles`)
-- [ ] **SERV-02** — Implement `WS /audio` endpoint: accept browser audio blobs, forward each blob to `DeepgramTranscriber.send_audio()`
-- [ ] **SERV-03** — Implement `WS /ws` endpoint: accept connections, store in a `set`, broadcast stat JSON to all active clients
-- [ ] **SERV-04** — Implement `broadcast(payload: dict)` helper: `json.dumps` and send to all `/ws` clients, remove disconnected clients silently
+- [ ] **SERV-01** — Create FastAPI app with `GET /` that serves `frontend/dist/index.html` (use `StaticFiles`) DONE
+- [ ] **SERV-02** — Implement `WS /audio` endpoint: accept browser audio blobs, forward each blob to `DeepgramTranscriber.send_audio()` DONE
+- [ ] **SERV-03** — Implement `WS /ws` endpoint: accept connections, store in a `set`, broadcast stat JSON to all active clients DONE
+- [ ] **SERV-04** — Implement `broadcast(payload: dict)` helper: `json.dumps` and send to all `/ws` clients, remove disconnected clients silently DONE
 - [ ] **SERV-05** — Wire full async pipeline: on `is_final` transcript from Deepgram →
   - `extract_entities()` →
   - For each player name → `lookup_player_id()` → `fetch_player_stats()` → `build_player_payload()` → `broadcast()`

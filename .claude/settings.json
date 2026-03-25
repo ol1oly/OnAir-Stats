@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "deepgram@deepgram-agent-skills": true
+  }
+}

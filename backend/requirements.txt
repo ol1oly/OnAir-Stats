@@ -1,0 +1,9 @@
+deepgram-sdk
+fastapi[standard]
+uvicorn
+websockets
+anthropic
+httpx
+python-dotenv
+rapidfuzz
+google-genai

@@ -1,4 +1,18 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv .venv)",
+      "Bash(find /c/Bureau/live_stats/backend -type f -name *.py)",
+      "Bash(ls:*)",
+      "Bash(grep -E \"\\\\.py$|\\\\.json$|\\\\.txt$|\\\\.toml$|\\\\.md$\")",
+      "WebFetch(domain:search.d3.nhle.com)",
+      "Bash(.venv/Scripts/python -c:*)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python -c:*)",
+      "Bash(.venv/Scripts/python tests/:*)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python tests/:*)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_server.py -v 2>&1)"
+    ]
+  },
   "spinnerTipsEnabled": true,
   "prefersReducedMotion": false
 }
