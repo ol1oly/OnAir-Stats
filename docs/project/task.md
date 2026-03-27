@@ -162,45 +162,45 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 
 ### STAT CARD — `frontend/src/StatCard.tsx`
 
-- [ ] **CARD-01** — Create `StatCard` component accepting props: `payload: PlayerPayload`, `onExpire: () => void`
-- [ ] **CARD-02** — Style card: dark semi-transparent background (`bg-black/80`), white bold player name, colored stat values (goals red, assists blue, points white, plus/minus green/red conditional)
-- [ ] **CARD-03** — Add entrance animation: slide in from left + fade in using Tailwind `animate-` or a CSS keyframe (`@keyframes slideIn`)
-- [ ] **CARD-04** — Add exit animation: fade out on expire
-- [ ] **CARD-05** — Implement auto-expire: `useEffect` sets `setTimeout(onExpire, 8000)` on mount, clears on unmount
+- [X] **CARD-01** — Create `StatCard` component accepting props: `payload: PlayerPayload`, `onExpire: () => void`
+- [X] **CARD-02** — Style card: dark semi-transparent background (`bg-black/80`), white bold player name, colored stat values (goals red, assists blue, points white, plus/minus green/red conditional)
+- [X] **CARD-03** — Add entrance animation: slide in from left + fade in using Tailwind `animate-` or a CSS keyframe (`@keyframes slideIn`)
+- [X] **CARD-04** — Add exit animation: fade out on expire
+- [X] **CARD-05** — Implement auto-expire: `useEffect` sets `setTimeout(onExpire, 8000)` on mount, clears on unmount
 
 ---
 
 ### TEAM CARD — `frontend/src/TeamCard.tsx`
 
-- [ ] **TEAM-01** — Create `TeamCard` component accepting props: `payload: TeamPayload`, `onExpire: () => void`
-- [ ] **TEAM-02** — Style card: same dark semi-transparent background as `StatCard`; team abbreviation large and bold in gold/amber (`text-amber-400`); W–L–OT record and points total prominent in white
-- [ ] **TEAM-03** — Reuse the same entrance/exit animation keyframes as `StatCard` (extract to a shared `animations.css` or Tailwind plugin if needed)
-- [ ] **TEAM-04** — Implement auto-expire with same `useEffect` / `setTimeout(onExpire, 8000)` pattern as `StatCard`
+- [X] **TEAM-01** — Create `TeamCard` component accepting props: `payload: TeamPayload`, `onExpire: () => void`
+- [X] **TEAM-02** — Style card: same dark semi-transparent background as `StatCard`; team abbreviation large and bold in gold/amber (`text-amber-400`); W–L–OT record and points total prominent in white
+- [X] **TEAM-03** — Reuse the same entrance/exit animation keyframes as `StatCard` (extract to a shared `animations.css` or Tailwind plugin if needed)
+- [X] **TEAM-04** — Implement auto-expire with same `useEffect` / `setTimeout(onExpire, 8000)` pattern as `StatCard`
 
 ---
 
 ### GOALIE CARD — `frontend/src/GoalieCard.tsx`
 
-- [ ] **GOALIE-01** — Create `GoalieCard` component accepting `payload: GoaliePayload`, `onExpire: () => void`
-- [ ] **GOALIE-02** — Style card: same dark semi-transparent background as `StatCard`; teal/cyan accent (`text-cyan-400`) to distinguish from skater cards; show name, team, headshot; stats: SV%, GAA, shutouts, W–L–OT
-- [ ] **GOALIE-03** — Reuse entrance/exit animation and `useEffect` / `setTimeout(onExpire, 8000)` auto-expire pattern from `StatCard`
+- [X] **GOALIE-01** — Create `GoalieCard` component accepting `payload: GoaliePayload`, `onExpire: () => void`
+- [X] **GOALIE-02** — Style card: same dark semi-transparent background as `StatCard`; teal/cyan accent (`text-cyan-400`) to distinguish from skater cards; show name, team, headshot; stats: SV%, GAA, shutouts, W–L–OT
+- [X] **GOALIE-03** — Reuse entrance/exit animation and `useEffect` / `setTimeout(onExpire, 8000)` auto-expire pattern from `StatCard`
 
 ---
 
 ### OVERLAY CANVAS — `frontend/src/OverlayCanvas.tsx`
 
-- [ ] **OVL-01** — Implement `OverlayCanvas` component: holds `cards: Array<StatPayload & { id: string }>` in state (add a unique `id = player/team + timestamp` on arrival)
-- [ ] **OVL-02** — Use `useOverlaySocket` hook; push `latestPayload` to card queue when it changes (deduplicate same entity within 2s window to avoid flicker)
-- [ ] **OVL-03** — Limit visible cards to 3: drop oldest if queue exceeds 3
-- [ ] **OVL-04** — Render cards stacked bottom-left: `absolute bottom-8 left-8 flex flex-col-reverse gap-3`; route by `payload.type`: `"player"` → `<StatCard>`, `"goalie"` → `<GoalieCard>`, `"team"` → `<TeamCard>`, `"system"` → update status indicator (do NOT add to card queue)
-- [ ] **OVL-05** — Handle `onExpire` callback: remove card from state by its `id`
+- [X] **OVL-01** — Implement `OverlayCanvas` component: holds `cards: Array<StatPayload & { id: string }>` in state (add a unique `id = player/team + timestamp` on arrival)
+- [X] **OVL-02** — Use `useOverlaySocket` hook; push `latestPayload` to card queue when it changes (deduplicate same entity within 2s window to avoid flicker)
+- [X] **OVL-03** — Limit visible cards to 3: drop oldest if queue exceeds 3
+- [X] **OVL-04** — Render cards stacked bottom-left: `absolute bottom-8 left-8 flex flex-col-reverse gap-3`; route by `payload.type`: `"player"` → `<StatCard>`, `"goalie"` → `<GoalieCard>`, `"team"` → `<TeamCard>`, `"system"` → update status indicator (do NOT add to card queue)
+- [X] **OVL-05** — Handle `onExpire` callback: remove card from state by its `id`
 
 ---
 
 ### ROOT — `frontend/src/main.tsx`
 
-- [ ] **ROOT-01** — Set root `div` to `w-screen h-screen bg-transparent overflow-hidden relative`
-- [ ] **ROOT-02** — Mount `<OverlayCanvas />` as the only child
+- [X] **ROOT-01** — Set root `div` to `w-screen h-screen bg-transparent overflow-hidden relative`
+- [X] **ROOT-02** — Mount `<OverlayCanvas />` as the only child
 - [ ] **ROOT-03** — Set `index.html` body background to `transparent`, add `<meta>` for OBS browser source compatibility
 
 ---
@@ -255,7 +255,7 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 - [ ] **OPT-01** — Expand `players.json` to full NHL roster via a one-time script hitting the NHL API roster endpoint
 - [ ] **OPT-02** — Add a `ConnectionStatus` indicator in the overlay (green dot = connected, red = reconnecting)
 - [ ] **OPT-03** — Add duplicate suppression: if same player or team card was shown in last 30s, skip re-display
-- [ ] **OPT-04** — Add team logo images to `TeamCard` (NHL CDN URLs, no auth required)
+- [X] **OPT-04** — Add team logo images to `TeamCard` (NHL CDN URLs, no auth required)
 - [ ] **OPT-05** — Publish image to Docker Hub so users can `docker pull` instead of building locally
 
 ---
