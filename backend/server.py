@@ -1,9 +1,11 @@
 """FastAPI server — NHL Radio Overlay backend."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -40,6 +42,11 @@ async def broadcast(payload: dict) -> None:
     _ws_clients -= dead
 
 
+def _system_payload(event: str, message: str) -> dict:
+    """Build a SystemPayload dict with the current Unix ms timestamp."""
+    return {"type": "system", "event": event, "message": message, "ts": int(time.time() * 1000)}
+
+
 # ---------------------------------------------------------------------------
 # on_transcript stub (SERV-05 will replace with extract → stats → broadcast)
 # ---------------------------------------------------------------------------
@@ -47,6 +54,18 @@ async def broadcast(payload: dict) -> None:
 def _on_transcript(text: str, is_final: bool) -> None:
     if is_final:
         print(f"[transcript] {text}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# SERV-07: transcriber lifecycle callbacks
+# ---------------------------------------------------------------------------
+
+def _on_transcriber_ready() -> None:
+    asyncio.create_task(broadcast(_system_payload("transcriber_ready", "Deepgram connected")))
+
+
+def _on_transcriber_error(message: str) -> None:
+    asyncio.create_task(broadcast(_system_payload("transcriber_error", message)))
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +77,12 @@ async def lifespan(app: FastAPI):
     global _transcriber
     api_key = os.environ.get("DEEPGRAM_API_KEY", "")
     if api_key:
-        _transcriber = DeepgramTranscriber(api_key=api_key, on_transcript=_on_transcript)
+        _transcriber = DeepgramTranscriber(
+            api_key=api_key,
+            on_transcript=_on_transcript,
+            on_ready=_on_transcriber_ready,
+            on_error=_on_transcriber_error,
+        )
         await _transcriber.start()
         print("[server] Deepgram transcriber connected", flush=True)
     else:
@@ -100,6 +124,7 @@ async def audio_endpoint(websocket: WebSocket) -> None:
 async def overlay_ws(websocket: WebSocket) -> None:
     await websocket.accept()
     _ws_clients.add(websocket)
+    await websocket.send_text(json.dumps(_system_payload("connected", "Overlay connected")))
     try:
         while True:
             await websocket.receive_text()  # keep-alive; client messages are ignored
@@ -107,6 +132,7 @@ async def overlay_ws(websocket: WebSocket) -> None:
         pass
     finally:
         _ws_clients.discard(websocket)
+        await broadcast(_system_payload("disconnected", "Overlay disconnected"))
 
 
 # ---------------------------------------------------------------------------

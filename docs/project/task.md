@@ -139,7 +139,7 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
   - For each player name → `lookup_player_id()` → `client.get_player()` → check `_type` → `build_player_payload()` or `build_goalie_payload()` → `broadcast()`
   - For each team name → `lookup_team_abbrev()` → `client.get_team()` → `build_team_payload()` → `broadcast()`
 - [ ] **SERV-06** — Test end-to-end: run server, send a test audio blob to `WS /audio`, verify transcript arrives and stat payloads broadcast on `WS /ws`
-- [ ] **SERV-07** — Emit `SystemPayload` events over `WS /ws`:
+- [x] **SERV-07** — Emit `SystemPayload` events over `WS /ws`:
   - New `/ws` client connects: `{ type: "system", event: "connected", message: "Overlay connected", ts }`
   - `/ws` client disconnects: `{ type: "system", event: "disconnected", message: "Overlay disconnected", ts }`
   - Deepgram WebSocket opens: `{ type: "system", event: "transcriber_ready", message: "Deepgram connected", ts }`

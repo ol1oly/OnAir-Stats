@@ -65,6 +65,18 @@ def reset_ws_clients():
     server._ws_clients.clear()
 
 
+@pytest.fixture()
+def mock_transcriber_cls(monkeypatch):
+    """Returns (class_mock, instance_mock) — lets tests inspect constructor kwargs."""
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "test-fake-key")
+    instance = MagicMock()
+    instance.start = AsyncMock()
+    instance.stop = AsyncMock()
+    instance.send_audio = AsyncMock()
+    with patch("server.DeepgramTranscriber", return_value=instance) as cls_mock:
+        yield cls_mock, instance
+
+
 # ---------------------------------------------------------------------------
 # SERV-01 — GET / serves React build
 # ---------------------------------------------------------------------------
@@ -200,3 +212,100 @@ class TestBroadcast:
 
         live1.send_text.assert_called_once()
         live2.send_text.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# SERV-07 — SystemPayload events
+# ---------------------------------------------------------------------------
+
+class TestSystemEvents:
+    def test_ws_connect_sends_system_connected(self, client):
+        with client.websocket_connect("/ws") as ws:
+            msg = ws.receive_json()
+        assert msg["type"] == "system"
+        assert msg["event"] == "connected"
+        assert msg["message"] == "Overlay connected"
+        assert isinstance(msg["ts"], int)
+
+    def test_ws_connect_ts_is_recent_unix_ms(self, client):
+        import time as _time
+        before = int(_time.time() * 1000)
+        with client.websocket_connect("/ws") as ws:
+            msg = ws.receive_json()
+        after = int(_time.time() * 1000)
+        assert before <= msg["ts"] <= after
+
+    def test_ws_disconnect_broadcasts_disconnected_to_remaining(self, client):
+        """After a /ws client disconnects, remaining clients receive system:disconnected."""
+        observer = _mock_ws()
+        with client.websocket_connect("/ws"):
+            server._ws_clients.add(observer)
+        # The observer should have received exactly one call: the disconnected broadcast
+        observer.send_text.assert_called_once()
+        msg = json.loads(observer.send_text.call_args[0][0])
+        assert msg["type"] == "system"
+        assert msg["event"] == "disconnected"
+        assert msg["message"] == "Overlay disconnected"
+        assert isinstance(msg["ts"], int)
+
+    def test_transcriber_constructed_with_on_ready(self, mock_transcriber_cls):
+        cls_mock, _ = mock_transcriber_cls
+        with TestClient(server.app):
+            pass
+        kwargs = cls_mock.call_args.kwargs
+        assert "on_ready" in kwargs
+        assert callable(kwargs["on_ready"])
+
+    def test_transcriber_constructed_with_on_error(self, mock_transcriber_cls):
+        cls_mock, _ = mock_transcriber_cls
+        with TestClient(server.app):
+            pass
+        kwargs = cls_mock.call_args.kwargs
+        assert "on_error" in kwargs
+        assert callable(kwargs["on_error"])
+
+    def test_on_ready_broadcasts_transcriber_ready(self, mock_transcriber_cls):
+        cls_mock, _ = mock_transcriber_cls
+        with TestClient(server.app):
+            on_ready = cls_mock.call_args.kwargs["on_ready"]
+
+        recorded: list[dict] = []
+
+        async def fake_broadcast(payload: dict) -> None:
+            recorded.append(payload)
+
+        with patch("server.broadcast", side_effect=fake_broadcast):
+            async def run() -> None:
+                on_ready()
+                await asyncio.sleep(0)  # yield so the created task executes
+
+            asyncio.run(run())
+
+        assert len(recorded) == 1
+        assert recorded[0]["type"] == "system"
+        assert recorded[0]["event"] == "transcriber_ready"
+        assert recorded[0]["message"] == "Deepgram connected"
+        assert isinstance(recorded[0]["ts"], int)
+
+    def test_on_error_broadcasts_transcriber_error_with_message(self, mock_transcriber_cls):
+        cls_mock, _ = mock_transcriber_cls
+        with TestClient(server.app):
+            on_error = cls_mock.call_args.kwargs["on_error"]
+
+        recorded: list[dict] = []
+
+        async def fake_broadcast(payload: dict) -> None:
+            recorded.append(payload)
+
+        with patch("server.broadcast", side_effect=fake_broadcast):
+            async def run() -> None:
+                on_error("invalid API key")
+                await asyncio.sleep(0)
+
+            asyncio.run(run())
+
+        assert len(recorded) == 1
+        assert recorded[0]["type"] == "system"
+        assert recorded[0]["event"] == "transcriber_error"
+        assert recorded[0]["message"] == "invalid API key"
+        assert isinstance(recorded[0]["ts"], int)

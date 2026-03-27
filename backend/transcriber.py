@@ -27,11 +27,15 @@ class DeepgramTranscriber:
         self,
         api_key: str,
         on_transcript: TranscriptCallback,
+        on_ready: Callable[[], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
         encoding: str | None = None,
         sample_rate: int | None = None,
     ) -> None:
         self._api_key = api_key
         self._on_transcript = on_transcript
+        self._on_ready = on_ready
+        self._on_error = on_error
         self._encoding = encoding
         self._sample_rate = str(sample_rate) if sample_rate else None
         self._client = AsyncDeepgramClient(api_key=api_key)
@@ -58,6 +62,8 @@ class DeepgramTranscriber:
             ) as conn:
                 self._connection = conn
                 self._ready.set()
+                if self._on_ready:
+                    self._on_ready()
                 async for msg in conn:
                     if not isinstance(msg, ListenV1Results):
                         continue
@@ -69,6 +75,8 @@ class DeepgramTranscriber:
             pass
         except Exception as exc:
             print(f"[transcriber] error: {exc}", file=sys.stderr, flush=True)
+            if self._on_error:
+                self._on_error(str(exc))
         finally:
             self._connection = None
 
