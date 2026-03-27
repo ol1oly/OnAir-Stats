@@ -10,9 +10,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import Literal
 
+from extractor import Extractor
+from stats import (
+    StatsClient,
+    build_goalie_payload,
+    build_player_payload,
+    build_team_payload,
+)
 from transcriber import DeepgramTranscriber
 
 load_dotenv()
@@ -23,6 +32,8 @@ load_dotenv()
 
 _ws_clients: set[WebSocket] = set()
 _transcriber: DeepgramTranscriber | None = None
+_extractor = Extractor()
+_stats_client = StatsClient()
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +41,9 @@ _transcriber: DeepgramTranscriber | None = None
 # ---------------------------------------------------------------------------
 
 async def broadcast(payload: dict) -> None:
-    """Send a JSON payload to all connected /ws clients. Removes dead connections silently."""
+    """Wrap payload in the v1 envelope and send to all /ws clients. Removes dead connections silently."""
     global _ws_clients
-    message = json.dumps(payload)
+    message = json.dumps({"v": 1, "payload": payload})
     dead: set[WebSocket] = set()
     for ws in _ws_clients:
         try:
@@ -48,12 +59,41 @@ def _system_payload(event: str, message: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# on_transcript stub (SERV-05 will replace with extract → stats → broadcast)
+# SERV-05: transcript → extract → stats → broadcast pipeline
 # ---------------------------------------------------------------------------
+
+async def _fetch_and_broadcast_player(player_id: int, name: str) -> None:
+    extracted = await _stats_client.get_player(player_id, name)
+    if extracted is None:
+        return
+    payload = build_goalie_payload(extracted) if extracted["_type"] == "goalie" else build_player_payload(extracted)
+    await broadcast(payload)
+
+
+async def _fetch_and_broadcast_team(abbrev: str) -> None:
+    extracted = await _stats_client.get_team(abbrev)
+    if extracted is None:
+        return
+    await broadcast(build_team_payload(extracted))
+
+
+async def _handle_transcript(text: str) -> None:
+    result = await _extractor.extract_entities(text)
+    coros = []
+    for name in result["players"]:
+        player_id = _stats_client.lookup_player_id(name)
+        if player_id is not None:
+            coros.append(_fetch_and_broadcast_player(player_id, name))
+    for abbrev in result["teams"]:
+        coros.append(_fetch_and_broadcast_team(abbrev))
+    if coros:
+        await asyncio.gather(*coros)
+
 
 def _on_transcript(text: str, is_final: bool) -> None:
     if is_final:
         print(f"[transcript] {text}", flush=True)
+        asyncio.create_task(_handle_transcript(text))
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +164,7 @@ async def audio_endpoint(websocket: WebSocket) -> None:
 async def overlay_ws(websocket: WebSocket) -> None:
     await websocket.accept()
     _ws_clients.add(websocket)
-    await websocket.send_text(json.dumps(_system_payload("connected", "Overlay connected")))
+    await websocket.send_text(json.dumps({"v": 1, "payload": _system_payload("connected", "Overlay connected")}))
     try:
         while True:
             await websocket.receive_text()  # keep-alive; client messages are ignored
@@ -133,6 +173,47 @@ async def overlay_ws(websocket: WebSocket) -> None:
     finally:
         _ws_clients.discard(websocket)
         await broadcast(_system_payload("disconnected", "Overlay disconnected"))
+
+
+# ---------------------------------------------------------------------------
+# SERV-08: POST /debug/inject — manually broadcast a stat payload for testing
+# ---------------------------------------------------------------------------
+
+class InjectRequest(BaseModel):
+    type: Literal["player", "team"]
+    id: int | None = None      # NHL player ID (player only)
+    name: str | None = None    # canonical name; resolved via lookup if id not given
+    abbrev: str | None = None  # team abbreviation (team only)
+
+
+@app.post("/debug/inject")
+async def debug_inject(req: InjectRequest) -> dict:
+    """Fetch live stats for the specified entity and broadcast to all /ws clients."""
+    if req.type == "player":
+        if req.id is not None:
+            player_id = req.id
+            display_name = str(player_id)
+        elif req.name is not None:
+            player_id = _stats_client.lookup_player_id(req.name)
+            if player_id is None:
+                raise HTTPException(status_code=404, detail=f"Player not found: {req.name}")
+            display_name = req.name
+        else:
+            raise HTTPException(status_code=422, detail="Provide 'id' or 'name' for type 'player'")
+        await _fetch_and_broadcast_player(player_id, display_name)
+
+    else:  # team
+        if req.abbrev is not None:
+            abbrev = req.abbrev
+        elif req.name is not None:
+            abbrev = _stats_client.lookup_team_abbrev(req.name)
+            if abbrev is None:
+                raise HTTPException(status_code=404, detail=f"Team not found: {req.name}")
+        else:
+            raise HTTPException(status_code=422, detail="Provide 'abbrev' or 'name' for type 'team'")
+        await _fetch_and_broadcast_team(abbrev)
+
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

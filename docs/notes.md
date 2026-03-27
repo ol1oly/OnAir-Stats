@@ -96,3 +96,69 @@ The pre-fetch runs concurrently with the stat lookup that was already triggered 
 - **Rate limiting:** the NHL API is public and has no documented rate limit, but firing 8 concurrent player fetches per team detection could be noisy. A small semaphore (e.g. `asyncio.Semaphore(3)`) on the pre-fetch loop keeps it polite.
 - **Opponent recursion:** the opponent pre-fetch should not recurse further (don't pre-fetch the opponent's opponent).
 - **Scope:** this is a background optimization only. If the pre-fetch hasn't completed when a player is actually mentioned, the normal on-demand fetch path still runs correctly.
+
+---
+
+## User-configurable stat fields per payload type
+
+**Date:** 2026-03-27
+
+Currently the payloads sent over `WS /ws` include a fixed set of fields:
+
+- **Player:** `goals`, `assists`, `points`, `plus_minus`
+- **Goalie:** *(not yet defined — implied: `save_pct`, `gaa`, `shutouts`)*
+- **Team:** `wins`, `losses`, `ot_losses`, `points`, `goals_for`, `goals_against`
+
+The idea is to let users choose which fields appear on each card type — both which stats to include and in what order.
+
+### Available fields per payload type
+
+The NHL API returns far more than the current fixed selection. A few useful candidates:
+
+| Payload | Available fields |
+|---|---|
+| **Skater** | `goals`, `assists`, `points`, `plus_minus`, `pim`, `shots`, `shooting_pct`, `toi_per_game`, `power_play_goals`, `power_play_points`, `game_winning_goals` |
+| **Goalie** | `save_pct`, `gaa`, `shutouts`, `wins`, `losses`, `ot_losses`, `saves`, `shots_against`, `toi` |
+| **Team** | `wins`, `losses`, `ot_losses`, `points`, `goals_for`, `goals_against`, `home_record`, `away_record`, `streak`, `goals_for_per_game`, `goals_against_per_game`, `power_play_pct`, `penalty_kill_pct` |
+
+### Backend implications
+
+`stats.py` would need a per-type field config (loaded from `config.json` or the trigger store) that is applied when constructing the payload before broadcasting. This keeps the NHL API fetch unchanged — fields are just cherry-picked at serialization time.
+
+```python
+# example config structure
+FIELD_CONFIG = {
+    "skater": ["goals", "assists", "points", "toi_per_game"],
+    "goalie": ["save_pct", "gaa", "shutouts"],
+    "team":   ["wins", "losses", "ot_losses", "points", "power_play_pct"],
+}
+```
+
+A reasonable default (matching current behavior) ships out of the box so no config is required to run.
+
+### UI implications
+
+This feature touches two distinct UI surfaces:
+
+**1. Settings / config panel (`FieldConfigPanel`)**
+
+A dedicated settings view where the user can, per payload type (skater / goalie / team):
+- Toggle fields on/off with checkboxes
+- Drag to reorder (the order determines the display order on the card)
+- Preview a live mock card as they adjust
+
+This panel writes to a persistent config (e.g. `config.json` via `POST /config/fields`). It does not need to be embedded in the overlay itself — it can live in a separate route (`/settings`) in the React app.
+
+**2. Stat card rendering (`StatCard`, `GoalieCard`, `TeamCard`)**
+
+The cards currently render a hardcoded list of rows. With configurable fields:
+- Cards must render dynamically from the `fields` array in the payload (the server pre-applies the config, so the frontend just iterates)
+- Label text should be human-readable (e.g. `"toi_per_game"` → `"TOI/GP"`); a frontend label map covers this
+- Card height becomes variable — a card with 2 fields is shorter than one with 6. The card container needs a `min-height` and should grow gracefully, or cap at a max row count (4–5 is a reasonable limit for readability at broadcast resolution)
+- The slide-in animation and dismiss timer are unaffected
+
+**3. Edge cases to handle**
+
+- If a field is configured but the API returns `null` (e.g. a player with no power-play time), omit that row rather than showing `null` or `0`
+- Goalies and skaters are both under `"player"` in the current payload type — the card renderer needs to branch on a `position` or `player_type` field to apply the right field config
+- Changing the config mid-broadcast should not affect cards already visible; only new cards pick up the new config

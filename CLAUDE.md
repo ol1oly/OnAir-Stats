@@ -13,7 +13,7 @@ The project is in active development. The backend core is functional; the fronte
 **Implemented:**
 - `backend/transcriber.py` — Deepgram WebSocket streaming transcriber
 - `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode planned but not wired
-- `backend/stats.py` — `StatsClient` lookups work; `get_player()` and `get_team()` raise `NotImplementedError` (pending)
+- `backend/stats.py` — `StatsClient` with 45s in-memory cache; `get_player()` (skater + goalie) and `get_team()` (standings) are fully implemented
 - `backend/server.py` — FastAPI with `WS /audio`, `WS /ws`, and static file serving
 - `backend/players.json` / `backend/teams.json` — entity data files
 - Frontend: default Vite + React scaffold (no overlay components yet)
@@ -23,14 +23,24 @@ The project is in active development. The backend core is functional; the fronte
 ## Development
 
 **Backend:**
+
+The backend uses a virtual environment at `backend/.venv`. Always use it explicitly — never the system Python.
+
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn server:app --reload --port 8000
+backend/.venv/Scripts/python.exe -m pip install -r requirements.txt
+backend/.venv/Scripts/python.exe -m uvicorn server:app --reload --port 8000
 ```
+
+Run tests:
+```bash
+backend/.venv/Scripts/python.exe -m pytest tests/
+backend/.venv/Scripts/python.exe -m pytest tests/test_server.py -v
+```
+
 ### Python Dependencies
 When installing any Python package:
-- Use `pip install <package>`
+- Use `backend/.venv/Scripts/python.exe -m pip install <package>`
 - Add the package and its version to requirements.txt manually (e.g. `requests==2.31.0`)
 - Do not use `pip freeze` as it captures indirect dependencies — only add the package you explicitly installed
 
@@ -41,6 +51,13 @@ npm install
 npm run dev       # dev server at http://localhost:5173
 npm run build     # outputs dist/ (required before serving from backend)
 npm run lint
+```
+
+**Tests:**
+```bash
+cd backend && pytest tests/
+cd backend && pytest tests/test_stats.py -v
+cd backend && pytest tests/test_extractor.py -v
 ```
 
 **Standalone module tests (no server needed):**
@@ -82,7 +99,7 @@ Browser mic (getUserMedia + MediaRecorder)
 | `transcriber.py` | Receives audio blobs from `WS /audio`, pipes to Deepgram; fires `on_transcript` for final segments only |
 | `extractor.py` | Dual-mode: `"llm"` (Claude/Gemini) or `"fuzzy"` (RapidFuzz n-gram). Returns `{ players: [], teams: [] }` |
 | `stats.py` | NHL API fetches with 45s in-memory cache. `players.json` maps names→IDs; `teams.json` maps names/aliases→abbreviations |
-| `server.py` | FastAPI app; `GET /` serves React build, `WS /ws` broadcasts stat JSON |
+| `server.py` | FastAPI app; `GET /` serves React build, `WS /audio` receives browser audio, `WS /ws` broadcasts stat JSON. **`_on_transcript()` is currently a stub** — the transcript→extract→stats→broadcast pipeline is not yet wired |
 | `trigger_resolver.py` | *(planned)* One-time LLM call to resolve NHL API endpoint + fields |
 | `trigger_store.py` | *(planned)* In-memory + JSON persistence for custom triggers |
 | `trigger_runner.py` | *(planned)* Runtime keyword matching + HTTP fetch + field extraction |
@@ -104,6 +121,7 @@ Browser mic (getUserMedia + MediaRecorder)
 
 All messages carry a `type` discriminator:
 - `"player"` → `{ player, stats: { goals, assists, points, plus_minus }, display }`
+- `"goalie"` → `{ player, stats: { saves, save_pct, goals_against_avg, wins, losses, ot_losses }, display }`
 - `"team"` → `{ team, abbrev, stats: { wins, losses, ot_losses, points, goals_for, goals_against }, display }`
 - `"trigger"` → `{ id, keywords, fields: [{ label, value }], display }`
 

@@ -11,7 +11,13 @@
       "Bash(.venv/Scripts/python tests/:*)",
       "Bash(PYTHONUTF8=1 .venv/Scripts/python tests/:*)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_server.py -v 2>&1)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npm test:*)",
+      "Bash(where python:*)",
+      "Bash(\"C:\\\\Bureau\\\\live_stats\\\\backend\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest \"C:\\\\Bureau\\\\live_stats\\\\backend\\\\tests\\\\test_server.py\" -v 2>&1)",
+      "Bash(npm run:*)",
+      "Bash(git:*)",
+      "Bash(npx tsc:*)"
     ]
   },
   "spinnerTipsEnabled": true,

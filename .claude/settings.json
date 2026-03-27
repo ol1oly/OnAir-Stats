@@ -1,5 +1,8 @@
 {
   "enabledPlugins": {
-    "deepgram@deepgram-agent-skills": true
+    "deepgram@deepgram-agent-skills": true,
+    "superpowers@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true
   }
 }
