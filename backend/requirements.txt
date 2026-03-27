@@ -7,3 +7,6 @@ httpx
 python-dotenv
 rapidfuzz
 google-genai
+sounddevice==0.5.5
+pytest==9.0.2
+anyio==4.13.0

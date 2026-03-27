@@ -394,3 +394,39 @@ Changes to `OverlayCanvas.tsx`:
 - Multiple field extraction strategies (e.g. aggregate, filter, sort) — MVP extracts raw field values only
 - Trigger ordering or priority when multiple triggers match simultaneously
 - Persistent trigger history / audit log
+
+---
+
+## Post-MVP Ideas
+
+### LLM-Generated Card HTML
+
+Instead of every trigger rendering through the same generic `TriggerCard` layout, a second LLM call at creation time could generate a custom HTML template for each trigger. A "Power Play Goals" card could look visually distinct from a "Save Percentage" card — different layout, accent color, and field emphasis — all reflecting the trigger's description.
+
+#### How it would work
+
+At trigger creation, `trigger_resolver.py` makes a second call after endpoint resolution, asking the LLM to produce a self-contained HTML snippet styled with the overlay's existing Tailwind classes. The template uses `{{Label}}` placeholder tokens (where `Label` matches a `field.label` value exactly) that get replaced with live data at render time.
+
+The resolver prompt would need to supply:
+- The Tailwind utility classes already used in `StatCard` and `TeamCard` — so the LLM works within the existing design system rather than inventing classes that don't exist in the build
+- Hard broadcast constraints: dark background, minimum readable font size, max card width
+- The trigger's keywords and description as creative context
+- An example input/output pair to lock in the expected format
+
+The generated template is stored as `html_template` in `TriggerRecord` alongside the existing fields.
+
+#### Open question 1 — filling in dynamic data at runtime
+
+**Option A (recommended): frontend substitution**
+The frontend fetches the full `TriggerRecord` list on load via `GET /triggers` and caches the templates. When a `TriggerPayload` arrives over the WebSocket, `TriggerCard` looks up the template by `trigger.id`, replaces each `{{field.label}}` token with the corresponding `field.value` from the payload, and renders the result. The backend never touches HTML strings at runtime.
+
+**Option B: backend substitution**
+The backend fills the template before broadcast and sends the completed HTML as a `html` field on `TriggerPayload`. Simpler for the frontend, but Python is now doing string manipulation on LLM-generated HTML on every trigger fire.
+
+#### Open question 2 — HTML flow from backend to frontend
+
+- `POST /triggers` response adds `html_template: string | null` to the returned `TriggerRecord`
+- The `useTriggers` hook stores it alongside the other trigger fields
+- `TriggerCard` checks: if `triggers[id].html_template` is present, substitute tokens and render via `dangerouslySetInnerHTML`; otherwise fall back to the generic field-list layout
+
+> **XSS:** the HTML comes from an LLM prompted by the user's own description, so the surface is limited to self-XSS. Still worth running the output through a sanitizer (e.g. DOMPurify) before passing to `dangerouslySetInnerHTML`.

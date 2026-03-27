@@ -6,50 +6,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **NHL Radio Overlay** — a live broadcast overlay that listens to NHL radio commentary, transcribes it in real-time, extracts player/team names, fetches live stats from the NHL API, and displays animated stat cards in a browser source for OBS.
 
-## Running the App
+## Current Implementation State
 
-```bash
-# Copy and fill in API keys
-cp .env.example .env
+The project is in active development. The backend core is functional; the frontend and Docker setup are not yet built.
 
-# Build and start (backend serves frontend)
-docker compose up --build
+**Implemented:**
+- `backend/transcriber.py` — Deepgram WebSocket streaming transcriber
+- `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode planned but not wired
+- `backend/stats.py` — `StatsClient` lookups work; `get_player()` and `get_team()` raise `NotImplementedError` (pending)
+- `backend/server.py` — FastAPI with `WS /audio`, `WS /ws`, and static file serving
+- `backend/players.json` / `backend/teams.json` — entity data files
+- Frontend: default Vite + React scaffold (no overlay components yet)
 
-# OBS Browser Source: http://localhost:8000 at 1920×1080
-```
+**Not yet built:** Docker / `docker-compose.yml`, `main.py`, trigger system (`trigger_resolver.py`, `trigger_store.py`, `trigger_runner.py`), all frontend overlay components.
 
-Required env vars (`.env`):
-```
-DEEPGRAM_API_KEY=
-ANTHROPIC_API_KEY=
-```
-
-## Development (without Docker)
+## Development
 
 **Backend:**
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn server:app --reload --port 8000
-
-# Run with mic input
-python main.py --mode mic
-
-# Run with audio file
-python main.py --mode file --path sample.mp3
 ```
+### Python Dependencies
+When installing any Python package:
+- Use `pip install <package>`
+- Add the package and its version to requirements.txt manually (e.g. `requests==2.31.0`)
+- Do not use `pip freeze` as it captures indirect dependencies — only add the package you explicitly installed
 
 **Frontend:**
 ```bash
 cd frontend
 npm install
 npm run dev       # dev server at http://localhost:5173
-npm run build     # outputs dist/ (required before docker build)
+npm run build     # outputs dist/ (required before serving from backend)
+npm run lint
 ```
 
-**Fuzzy extraction test:**
+**Standalone module tests (no server needed):**
 ```bash
-python testing_fuzz.py
+# Test extractor against sample sentences
+python backend/extractor.py "McDavid scores against the Maple Leafs"
+
+# Test transcriber against an audio file or mic
+python backend/transcriber.py sample.mp3
+python backend/transcriber.py --mic
+```
+
+## Environment Variables (`.env`)
+
+```
+DEEPGRAM_API_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+EXTRACTOR_MODE=llm    # "llm" or "fuzzy"
 ```
 
 ## Architecture
@@ -68,24 +78,24 @@ Browser mic (getUserMedia + MediaRecorder)
 
 | File | Role |
 |---|---|
-| `main.py` | Entry point; wires transcriber → extractor → stats → broadcast |
+| `main.py` | *(planned)* Entry point; wires transcriber → extractor → stats → broadcast |
 | `transcriber.py` | Receives audio blobs from `WS /audio`, pipes to Deepgram; fires `on_transcript` for final segments only |
-| `extractor.py` | Dual-mode: `"llm"` (Claude API) or `"fuzzy"` (RapidFuzz n-gram). Returns `{ players: [], teams: [] }` |
+| `extractor.py` | Dual-mode: `"llm"` (Claude/Gemini) or `"fuzzy"` (RapidFuzz n-gram). Returns `{ players: [], teams: [] }` |
 | `stats.py` | NHL API fetches with 45s in-memory cache. `players.json` maps names→IDs; `teams.json` maps names/aliases→abbreviations |
 | `server.py` | FastAPI app; `GET /` serves React build, `WS /ws` broadcasts stat JSON |
-| `trigger_resolver.py` | One-time LLM call at trigger-creation time to resolve NHL API endpoint + fields |
-| `trigger_store.py` | In-memory + JSON persistence for custom triggers (`triggers.json`) |
-| `trigger_runner.py` | Runtime keyword matching + HTTP fetch + field extraction for custom triggers |
+| `trigger_resolver.py` | *(planned)* One-time LLM call to resolve NHL API endpoint + fields |
+| `trigger_store.py` | *(planned)* In-memory + JSON persistence for custom triggers |
+| `trigger_runner.py` | *(planned)* Runtime keyword matching + HTTP fetch + field extraction |
 
-### Frontend (`frontend/src/`)
+### Frontend (`frontend/src/`) — planned components
 
 | File | Role |
 |---|---|
-| `useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 3s audio blobs as binary over `WS /audio`; exposes `start()`, `stop()`, `isRecording`, `isConnected` |
+| `useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 3s audio blobs as binary over `WS /audio` |
 | `useOverlaySocket.ts` | WS hook; auto-reconnect with exponential backoff; parses `PlayerPayload \| TeamPayload \| TriggerPayload` |
 | `OverlayCanvas.tsx` | Card queue manager (max 3 visible, 2s dedup window, bottom-left stacked) |
 | `StatCard.tsx` | Player stat card; slide-in, 8s auto-dismiss; goals=red, assists=blue |
-| `TeamCard.tsx` | Team stat card; same animation; gold/amber accent |
+| `TeamCard.tsx` | Team stat card; gold/amber accent |
 | `TriggerCard.tsx` | Custom trigger card; purple/violet accent |
 | `TriggerBuilder.tsx` | UI to create custom triggers with LLM-resolved endpoint preview |
 | `TriggerList.tsx` | List/toggle/delete saved custom triggers |
@@ -97,32 +107,24 @@ All messages carry a `type` discriminator:
 - `"team"` → `{ team, abbrev, stats: { wins, losses, ot_losses, points, goals_for, goals_against }, display }`
 - `"trigger"` → `{ id, keywords, fields: [{ label, value }], display }`
 
-### Custom Trigger system
-
-Users create triggers via `POST /triggers` with `{ keywords, description }`. The backend calls Claude once to resolve the best-matching NHL API endpoint and fields. At runtime, keyword fuzzy-matching fires the stored HTTP call — no LLM involved. Triggers persist across restarts via `triggers.json`.
-
 ## Key NHL API Endpoints
 
 Base: `https://api-web.nhle.com/v1/`
 
 - Player stats: `GET /player/{id}/landing`
 - Team standings: `GET /standings/now` (all 32 teams in one response; cache as single entry)
-- Schedule: `GET /schedule/now`
-- Boxscore: `GET /gamecenter/{GAME_ID}/boxscore`
+- Player search: `GET https://search.d3.nhle.com/api/v1/search/player?q={name}&active=true`
 
 `SEASON_ID` format: `<startYear><endYear>` e.g. `20232024`
 
 ## Data Files
 
-- `backend/players.json` — `{ "Connor McDavid": 8478402, ... }` (~50 seeded players; extend via NHL API roster endpoint)
+- `backend/players.json` — `{ "Connor McDavid": 8478402, ... }` (~50 seeded players)
 - `backend/teams.json` — `{ "Edmonton Oilers": "EDM", "Oilers": "EDM", ... }` (all 32 teams + common aliases)
-- `backend/triggers.json` — persisted custom triggers (auto-created, do not edit manually)
-- `backend/specs/api_spec_A.md` + `api_spec_B.md` — NHL API spec files used by the trigger resolver
+- `backend/triggers.json` — *(planned)* persisted custom triggers
 
-## Docker
+## Docker (planned)
 
 - Default: only `backend` runs; FastAPI serves the pre-built React `dist/` at `GET /`
 - `--profile full`: also starts a standalone nginx frontend on port 5173
-- No mic device passthrough needed — audio is captured in the browser via `getUserMedia`
-- OBS browser source: enable "Allow audio capture" in OBS source settings for mic access
-- Rebuild after frontend changes: `docker compose build && docker compose up`
+- OBS Browser Source: `http://localhost:8000` at 1920×1080; enable "Allow audio capture" in OBS source settings

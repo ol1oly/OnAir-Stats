@@ -10,7 +10,8 @@
       "Bash(PYTHONUTF8=1 .venv/Scripts/python -c:*)",
       "Bash(.venv/Scripts/python tests/:*)",
       "Bash(PYTHONUTF8=1 .venv/Scripts/python tests/:*)",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/test_server.py -v 2>&1)"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_server.py -v 2>&1)",
+      "Bash(python:*)"
     ]
   },
   "spinnerTipsEnabled": true,
