@@ -51,6 +51,11 @@ describe('GoalieCard — content', () => {
     render(<GoalieCard payload={payload} onExpire={() => {}} />)
     expect(screen.getByText('22W 19L 4OT')).toBeTruthy()
   })
+
+  it('renders shutouts value', () => {
+    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    expect(screen.getByText('2')).toBeTruthy()
+  })
 })
 
 describe('GoalieCard — headshot', () => {

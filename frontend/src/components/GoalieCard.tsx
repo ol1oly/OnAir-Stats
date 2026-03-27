@@ -25,7 +25,7 @@ export function GoalieCard({ payload, onExpire }: Props) {
     }
   }, [onExpire])
 
-  const svPct = payload.stats.save_percentage.toFixed(3).replace('0.', '.')
+  const svPct = payload.stats.save_percentage.toFixed(3).replace(/^0\./, '.')
   const gaa = payload.stats.goals_against_avg.toFixed(2)
   const { wins, losses, ot_losses, shutouts } = payload.stats
 
@@ -63,7 +63,7 @@ export function GoalieCard({ payload, onExpire }: Props) {
             <span className="text-gray-400 text-[13px] ml-1">GAA</span>
           </span>
           <span>
-            <span className="text-white font-semibold text-[16px]">{shutouts}</span>
+            <span className="text-cyan-400 font-semibold text-[16px]">{shutouts}</span>
             <span className="text-gray-400 text-[13px] ml-1">SO</span>
           </span>
         </div>
