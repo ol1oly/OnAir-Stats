@@ -14,11 +14,15 @@ export function StatCard({ payload, onExpire }: Props) {
   const [isExiting, setIsExiting] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    let inner: ReturnType<typeof setTimeout>
+    const outer = setTimeout(() => {
       setIsExiting(true)
-      setTimeout(onExpire, 200)
+      inner = setTimeout(onExpire, 200)
     }, 8000)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(outer)
+      clearTimeout(inner)
+    }
   }, [onExpire])
 
   const pm = payload.stats.plus_minus
