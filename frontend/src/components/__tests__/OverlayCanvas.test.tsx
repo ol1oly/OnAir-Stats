@@ -29,7 +29,7 @@ const team: TeamPayload = {
 
 beforeEach(() => {
   mockLatestPayload = null
-  vi.useFakeTimers()
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
 })
 afterEach(() => {
   vi.useRealTimers()

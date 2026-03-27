@@ -25,6 +25,17 @@ function cardId(p: StatPayload): string {
   return `system_${p.ts}`
 }
 
+type CardWrapperProps = { item: CardItem; removeCard: (id: string) => void }
+
+function CardWrapper({ item, removeCard }: CardWrapperProps) {
+  const onExpire = useCallback(() => removeCard(item.id), [removeCard, item.id])
+  const { id, payload } = item
+  if (payload.type === 'player') return <StatCard key={id} payload={payload} onExpire={onExpire} />
+  if (payload.type === 'goalie') return <GoalieCard key={id} payload={payload} onExpire={onExpire} />
+  if (payload.type === 'team') return <TeamCard key={id} payload={payload} onExpire={onExpire} />
+  return null
+}
+
 export function OverlayCanvas() {
   const { latestPayload } = useOverlaySocket(WS_URL)
   const [cards, setCards] = useState<CardItem[]>([])
@@ -50,12 +61,9 @@ export function OverlayCanvas() {
 
   return (
     <div className="absolute bottom-8 left-8 flex flex-col-reverse gap-3">
-      {cards.map(({ id, payload }) => {
-        if (payload.type === 'player') return <StatCard key={id} payload={payload} onExpire={() => removeCard(id)} />
-        if (payload.type === 'goalie') return <GoalieCard key={id} payload={payload} onExpire={() => removeCard(id)} />
-        if (payload.type === 'team') return <TeamCard key={id} payload={payload} onExpire={() => removeCard(id)} />
-        return null
-      })}
+      {cards.map(item => (
+        <CardWrapper key={item.id} item={item} removeCard={removeCard} />
+      ))}
     </div>
   )
 }
