@@ -1,4 +1,4 @@
-deepgram-sdk
+deepgram-sdk==6.0.1
 fastapi[standard]
 uvicorn
 websockets
