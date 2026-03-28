@@ -8,17 +8,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Implementation State
 
-The project is in active development. The backend core is functional; the frontend and Docker setup are not yet built.
+The project is in active development. Backend pipeline stub is wired; frontend overlay components and hooks are built but the backend `_on_transcript()` pipeline is not yet connected.
 
 **Implemented:**
 - `backend/transcriber.py` — Deepgram WebSocket streaming transcriber
-- `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode planned but not wired
-- `backend/stats.py` — `StatsClient` with 45s in-memory cache; `get_player()` (skater + goalie) and `get_team()` (standings) are fully implemented
-- `backend/server.py` — FastAPI with `WS /audio`, `WS /ws`, and static file serving
-- `backend/players.json` / `backend/teams.json` — entity data files
-- Frontend: default Vite + React scaffold (no overlay components yet)
+- `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode partially wired
+- `backend/stats.py` — `StatsClient` with 45s in-memory cache; `get_player()` (skater + goalie) and `get_team()` (standings) fully implemented
+- `backend/server.py` — FastAPI app; `_on_transcript()` is still a stub (pipeline not yet wired)
+- `frontend/src/components/` — `OverlayCanvas`, `StatCard`, `GoalieCard`, `TeamCard` (all built with Tailwind + slide-in animations)
+- `frontend/src/hooks/` — `useOverlaySocket.ts` (WS hook with auto-reconnect), `useMicCapture.ts` (getUserMedia + MediaRecorder)
+- `frontend/src/types/payloads.ts` — full TypeScript payload types for all message shapes
+- Tests: `backend/tests/` (pytest) and `frontend/src/components/__tests__/` + `frontend/src/hooks/__tests__/` (Vitest + Testing Library)
 
-**Not yet built:** Docker / `docker-compose.yml`, `main.py`, trigger system (`trigger_resolver.py`, `trigger_store.py`, `trigger_runner.py`), all frontend overlay components.
+**Not yet built:** Docker / `docker-compose.yml`, `main.py`, trigger system (`trigger_resolver.py`, `trigger_store.py`, `trigger_runner.py`), `TriggerCard.tsx`, `TriggerBuilder.tsx`, `TriggerList.tsx`, mic control UI (MIC-02), backend `_on_transcript()` pipeline wiring.
 
 ## Development
 
@@ -51,23 +53,27 @@ npm install
 npm run dev       # dev server at http://localhost:5173
 npm run build     # outputs dist/ (required before serving from backend)
 npm run lint
+npm run test      # Vitest (jsdom environment)
 ```
 
 **Tests:**
 ```bash
-cd backend && pytest tests/
-cd backend && pytest tests/test_stats.py -v
-cd backend && pytest tests/test_extractor.py -v
+# Backend
+backend/.venv/Scripts/python.exe -m pytest tests/
+backend/.venv/Scripts/python.exe -m pytest tests/test_stats.py -v
+
+# Frontend (from frontend/)
+npm run test
 ```
 
 **Standalone module tests (no server needed):**
 ```bash
 # Test extractor against sample sentences
-python backend/extractor.py "McDavid scores against the Maple Leafs"
+backend/.venv/Scripts/python.exe backend/extractor.py "McDavid scores against the Maple Leafs"
 
 # Test transcriber against an audio file or mic
-python backend/transcriber.py sample.mp3
-python backend/transcriber.py --mic
+backend/.venv/Scripts/python.exe backend/transcriber.py sample.mp3
+backend/.venv/Scripts/python.exe backend/transcriber.py --mic
 ```
 
 ## Environment Variables (`.env`)
@@ -104,26 +110,31 @@ Browser mic (getUserMedia + MediaRecorder)
 | `trigger_store.py` | *(planned)* In-memory + JSON persistence for custom triggers |
 | `trigger_runner.py` | *(planned)* Runtime keyword matching + HTTP fetch + field extraction |
 
-### Frontend (`frontend/src/`) — planned components
+### Frontend (`frontend/src/`)
 
 | File | Role |
 |---|---|
-| `useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 3s audio blobs as binary over `WS /audio` |
-| `useOverlaySocket.ts` | WS hook; auto-reconnect with exponential backoff; parses `PlayerPayload \| TeamPayload \| TriggerPayload` |
-| `OverlayCanvas.tsx` | Card queue manager (max 3 visible, 2s dedup window, bottom-left stacked) |
-| `StatCard.tsx` | Player stat card; slide-in, 8s auto-dismiss; goals=red, assists=blue |
-| `TeamCard.tsx` | Team stat card; gold/amber accent |
-| `TriggerCard.tsx` | Custom trigger card; purple/violet accent |
-| `TriggerBuilder.tsx` | UI to create custom triggers with LLM-resolved endpoint preview |
-| `TriggerList.tsx` | List/toggle/delete saved custom triggers |
+| `hooks/useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 3s audio blobs as binary over `WS /audio` |
+| `hooks/useOverlaySocket.ts` | WS hook; auto-reconnect with exponential backoff; parses `Envelope { v:1, payload: StatPayload }` |
+| `types/payloads.ts` | Full TS types: `PlayerPayload`, `GoaliePayload`, `TeamPayload`, `TriggerPayload`, `SystemPayload`, `StatPayload`, `Envelope` |
+| `components/OverlayCanvas.tsx` | Card queue manager (max 3 visible, 2s dedup window, bottom-left stacked); `?debug` URL param shows countdown |
+| `components/StatCard.tsx` | Skater stat card; slide-in, 8s auto-dismiss; goals=red, assists=blue |
+| `components/GoalieCard.tsx` | Goalie stat card; teal accent |
+| `components/TeamCard.tsx` | Team stat card; gold/amber accent |
+| `TriggerCard.tsx` | *(planned)* Custom trigger card; purple/violet accent |
+| `TriggerBuilder.tsx` | *(planned)* UI to create custom triggers with LLM-resolved endpoint preview |
+| `TriggerList.tsx` | *(planned)* List/toggle/delete saved custom triggers |
+
+**WebSocket message envelope:** all messages are `{ v: 1, payload: StatPayload }`. The `payload.type` discriminator selects the card component.
 
 ### Payload shapes (WebSocket messages)
 
-All messages carry a `type` discriminator:
-- `"player"` → `{ player, stats: { goals, assists, points, plus_minus }, display }`
-- `"goalie"` → `{ player, stats: { saves, save_pct, goals_against_avg, wins, losses, ot_losses }, display }`
-- `"team"` → `{ team, abbrev, stats: { wins, losses, ot_losses, points, goals_for, goals_against }, display }`
-- `"trigger"` → `{ id, keywords, fields: [{ label, value }], display }`
+All messages are wrapped in `{ v: 1, payload: StatPayload }`. The `payload.type` discriminator:
+- `"player"` → `{ id, name, team, position, headshot_url, stats: { season, games_played, goals, assists, points, plus_minus }, display, ts }`
+- `"goalie"` → `{ id, name, team, headshot_url, stats: { season, games_played, wins, losses, ot_losses, save_percentage, goals_against_avg, shutouts }, display, ts }`
+- `"team"` → `{ name, abbrev, logo_url, stats: { season, wins, losses, ot_losses, points, games_played, goals_for, goals_against, point_pct }, conference_rank, division_rank, display, ts }`
+- `"trigger"` → `{ id, keywords, description, fields: [{ label, value }], display, ts }`
+- `"system"` → `{ event: 'connected'|'disconnected'|'transcriber_ready'|'transcriber_error', message, ts }`
 
 ## Key NHL API Endpoints
 

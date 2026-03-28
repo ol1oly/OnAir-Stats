@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { PlayerPayload } from '../types/payloads'
 
 function initials(name: string): string {
@@ -7,23 +7,10 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-type Props = { payload: PlayerPayload; onExpire: () => void }
+type Props = { payload: PlayerPayload; isExiting: boolean }
 
-export function StatCard({ payload, onExpire }: Props) {
+export function StatCard({ payload, isExiting }: Props) {
   const [imgError, setImgError] = useState(false)
-  const [isExiting, setIsExiting] = useState(false)
-
-  useEffect(() => {
-    let inner: ReturnType<typeof setTimeout>
-    const outer = setTimeout(() => {
-      setIsExiting(true)
-      inner = setTimeout(onExpire, 200)
-    }, 8000)
-    return () => {
-      clearTimeout(outer)
-      clearTimeout(inner)
-    }
-  }, [onExpire])
 
   const pm = payload.stats.plus_minus
   const pmStr = pm >= 0 ? `+${pm}` : `${pm}`

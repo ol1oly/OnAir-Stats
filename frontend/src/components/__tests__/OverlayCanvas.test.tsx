@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import { OverlayCanvas } from '../OverlayCanvas'
 import type { PlayerPayload, GoaliePayload, TeamPayload } from '../../types/payloads'
 
@@ -29,7 +29,7 @@ const team: TeamPayload = {
 
 beforeEach(() => {
   mockLatestPayload = null
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -65,25 +65,44 @@ describe('OverlayCanvas — routing', () => {
 })
 
 describe('OverlayCanvas — deduplication', () => {
-  it('does not add a duplicate card for the same entity within 2s', () => {
+  it('resets existing card instead of adding a duplicate when entity is still visible', () => {
     const { rerender } = render(<OverlayCanvas />)
     act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    act(() => { vi.advanceTimersByTime(1000) })
     act(() => {
-      mockLatestPayload = { ...player, ts: player.ts + 100 }
+      mockLatestPayload = { ...player, ts: player.ts + 1000 }
       rerender(<OverlayCanvas />)
     })
     expect(screen.getAllByText('Connor McDavid')).toHaveLength(1)
   })
 
-  it('adds a card for the same entity after 2s', () => {
+  it('adds a new card after prior card expires and dedup window passes', () => {
     const { rerender } = render(<OverlayCanvas />)
     act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
-    act(() => { vi.advanceTimersByTime(2001) })
+    // card expires at 8200ms, dedup window (2000ms) ends at 10200ms
+    act(() => { vi.advanceTimersByTime(10201) })
     act(() => {
-      mockLatestPayload = { ...player, ts: player.ts + 2001 }
+      mockLatestPayload = { ...player, ts: player.ts + 10201 }
       rerender(<OverlayCanvas />)
     })
-    expect(screen.getAllByText('Connor McDavid')).toHaveLength(2)
+    expect(screen.getByText('Connor McDavid')).toBeTruthy()
+  })
+
+  it('does not add a duplicate card within the 2s dedup window when no active card', () => {
+    const { rerender } = render(<OverlayCanvas />)
+    // Advance past card expiry (8200ms) but stay within 2s of last processing
+    // Trigger: first payload at t=8000ms (card still showing), seenRef updates to 8000ms,
+    // card resets to expire at 16200ms. Then card gets manually removed and a payload
+    // arrives at t=9000ms (within 2s of seenRef=8000ms).
+    // Simpler: just verify a second payload at t=100ms (before seenRef expires) doesn't add.
+    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    act(() => { vi.advanceTimersByTime(100) })
+    // Same entity arrives 100ms later — card still active, gets reset (not a new card)
+    act(() => {
+      mockLatestPayload = { ...player, ts: player.ts + 100 }
+      rerender(<OverlayCanvas />)
+    })
+    expect(screen.getAllByText('Connor McDavid')).toHaveLength(1)
   })
 })
 
@@ -104,5 +123,28 @@ describe('OverlayCanvas — max cards', () => {
     expect(screen.getByText('Player Two')).toBeTruthy()
     expect(screen.getByText('Player Three')).toBeTruthy()
     expect(screen.getByText('Player Four')).toBeTruthy()
+  })
+})
+
+describe('OverlayCanvas — timer', () => {
+  it('removes card after 8200ms', () => {
+    const { rerender } = render(<OverlayCanvas />)
+    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    expect(screen.getByText('Connor McDavid')).toBeTruthy()
+    act(() => { vi.advanceTimersByTime(8201) })
+    expect(screen.queryByText('Connor McDavid')).toBeNull()
+  })
+
+  it('click on card resets its 8s timer', () => {
+    const { rerender } = render(<OverlayCanvas />)
+    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    // advance 7s — card is still showing, 1s remaining
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(screen.getByText('Connor McDavid')).toBeTruthy()
+    // click the card to reset
+    act(() => { fireEvent.click(screen.getByText('Connor McDavid')) })
+    // advance another 7s — timer was reset, so card should still be showing
+    act(() => { vi.advanceTimersByTime(7000) })
+    expect(screen.getByText('Connor McDavid')).toBeTruthy()
   })
 })

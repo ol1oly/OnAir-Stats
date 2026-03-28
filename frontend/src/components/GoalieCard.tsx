@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { GoaliePayload } from '../types/payloads'
 
 function initials(name: string): string {
@@ -7,23 +7,10 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-type Props = { payload: GoaliePayload; onExpire: () => void }
+type Props = { payload: GoaliePayload; isExiting: boolean }
 
-export function GoalieCard({ payload, onExpire }: Props) {
+export function GoalieCard({ payload, isExiting }: Props) {
   const [imgError, setImgError] = useState(false)
-  const [isExiting, setIsExiting] = useState(false)
-
-  useEffect(() => {
-    let inner: ReturnType<typeof setTimeout>
-    const outer = setTimeout(() => {
-      setIsExiting(true)
-      inner = setTimeout(onExpire, 200)
-    }, 8000)
-    return () => {
-      clearTimeout(outer)
-      clearTimeout(inner)
-    }
-  }, [onExpire])
 
   const svPct = payload.stats.save_percentage.toFixed(3).replace(/^0\./, '.')
   const gaa = payload.stats.goals_against_avg.toFixed(2)

@@ -151,12 +151,12 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 
 ### WEBSOCKET HOOK — `frontend/src/useOverlaySocket.ts`
 
-- [ ] **WS-01** — Copy the full TypeScript block from `docs/api/ws-payload-contract.md` into `frontend/src/types/payloads.ts` and export all types:
+- [X] **WS-01** — Copy the full TypeScript block from `docs/api/ws-payload-contract.md` into `frontend/src/types/payloads.ts` and export all types:
   `PlayerPayload`, `GoaliePayload`, `TeamPayload`, `TriggerPayload`, `SystemPayload`, `StatPayload`, `Envelope`
   All messages are wrapped in `{ v: 1, payload: StatPayload }` — the hook must unwrap the envelope.
-- [ ] **WS-02** — Implement `useOverlaySocket(url: string)` custom hook; connect to WS on mount, auto-reconnect on close (exponential backoff, max 5s delay)
-- [ ] **WS-03** — Parse incoming messages: unwrap envelope (`msg.payload`) before discriminating on `type`; handle `"player"`, `"goalie"`, `"team"`, `"trigger"`, `"system"` types
-- [ ] **WS-04** — Return `{ latestPayload: StatPayload | null, systemEvent: SystemPayload | null, isConnected: boolean }` from the hook
+- [X] **WS-02** — Implement `useOverlaySocket(url: string)` custom hook; connect to WS on mount, auto-reconnect on close (exponential backoff, max 5s delay)
+- [X] **WS-03** — Parse incoming messages: unwrap envelope (`msg.payload`) before discriminating on `type`; handle `"player"`, `"goalie"`, `"team"`, `"trigger"`, `"system"` types
+- [X] **WS-04** — Return `{ latestPayload: StatPayload | null, systemEvent: SystemPayload | null, isConnected: boolean }` from the hook
 
 ---
 
@@ -194,6 +194,8 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 - [X] **OVL-03** — Limit visible cards to 3: drop oldest if queue exceeds 3
 - [X] **OVL-04** — Render cards stacked bottom-left: `absolute bottom-8 left-8 flex flex-col-reverse gap-3`; route by `payload.type`: `"player"` → `<StatCard>`, `"goalie"` → `<GoalieCard>`, `"team"` → `<TeamCard>`, `"system"` → update status indicator (do NOT add to card queue)
 - [X] **OVL-05** — Handle `onExpire` callback: remove card from state by its `id`
+- [X] **OVL-06** — Timer reset on dedup: duplicate payload for active card bumps `resetKey` on `CardItem`; `CardWrapper` restarts 8s timer when `resetKey` changes; click on card also resets timer
+- [X] **OVL-07** — Debug countdown: `?debug` URL param shows live `Xs` badge via isolated `DebugCountdown` component (re-renders per second without touching card components)
 
 ---
 

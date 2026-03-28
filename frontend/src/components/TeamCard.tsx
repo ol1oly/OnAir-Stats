@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { TeamPayload } from '../types/payloads'
 
 function ordinal(n: number): string {
@@ -11,23 +11,10 @@ function ordinal(n: number): string {
   return 'th'
 }
 
-type Props = { payload: TeamPayload; onExpire: () => void }
+type Props = { payload: TeamPayload; isExiting: boolean }
 
-export function TeamCard({ payload, onExpire }: Props) {
+export function TeamCard({ payload, isExiting }: Props) {
   const [imgError, setImgError] = useState(false)
-  const [isExiting, setIsExiting] = useState(false)
-
-  useEffect(() => {
-    let inner: ReturnType<typeof setTimeout>
-    const outer = setTimeout(() => {
-      setIsExiting(true)
-      inner = setTimeout(onExpire, 200)
-    }, 8000)
-    return () => {
-      clearTimeout(outer)
-      clearTimeout(inner)
-    }
-  }, [onExpire])
 
   const divRank = `${payload.division_rank}${ordinal(payload.division_rank)}`
   const confRank = `${payload.conference_rank}${ordinal(payload.conference_rank)}`

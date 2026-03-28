@@ -162,3 +162,9 @@ The cards currently render a hardcoded list of rows. With configurable fields:
 - If a field is configured but the API returns `null` (e.g. a player with no power-play time), omit that row rather than showing `null` or `0`
 - Goalies and skaters are both under `"player"` in the current payload type — the card renderer needs to branch on a `position` or `player_type` field to apply the right field config
 - Changing the config mid-broadcast should not affect cards already visible; only new cards pick up the new config
+
+
+
+# note from olivier
+ - will probably need to refactor the test directory to use a standardized structure for the tests.
+ - will probably need to add more variables in the env file to be able to configure easily the time slide and other good parameters. I noticed a lot of hardcoded variable in the code, will need to have opus at max to analyze the repo and suggest places to be able to easily modify critical variables

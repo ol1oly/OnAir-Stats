@@ -28,58 +28,59 @@ afterEach(() => { vi.useRealTimers() })
 
 describe('GoalieCard — content', () => {
   it('renders the goalie name', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('Jacob Markstrom')).toBeTruthy()
   })
 
   it('renders the team abbreviation', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('NJD')).toBeTruthy()
   })
 
   it('renders save percentage without leading zero', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('.907')).toBeTruthy()
   })
 
   it('renders GAA formatted to 2 decimal places', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('2.98')).toBeTruthy()
   })
 
   it('renders W-L-OT record', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('22W 19L 4OT')).toBeTruthy()
   })
 
   it('renders shutouts value', () => {
-    render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    render(<GoalieCard payload={payload} isExiting={false} />)
     expect(screen.getByText('2')).toBeTruthy()
   })
 })
 
 describe('GoalieCard — headshot', () => {
   it('renders img with headshot_url as src', () => {
-    const { container } = render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    const { container } = render(<GoalieCard payload={payload} isExiting={false} />)
     const img = container.querySelector('img')
     expect(img?.getAttribute('src')).toBe('https://example.com/markstrom.png')
   })
 
   it('shows initials fallback (JM) when image errors', () => {
-    const { container } = render(<GoalieCard payload={payload} onExpire={() => {}} />)
+    const { container } = render(<GoalieCard payload={payload} isExiting={false} />)
     fireEvent.error(container.querySelector('img')!)
     expect(container.querySelector('img')).toBeNull()
     expect(screen.getByText('JM')).toBeTruthy()
   })
 })
 
-describe('GoalieCard — lifecycle', () => {
-  it('calls onExpire after 8200ms', () => {
-    const onExpire = vi.fn()
-    render(<GoalieCard payload={payload} onExpire={onExpire} />)
-    vi.advanceTimersByTime(8000)
-    expect(onExpire).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(200)
-    expect(onExpire).toHaveBeenCalledOnce()
+describe('GoalieCard — animation', () => {
+  it('applies card-enter class when not exiting', () => {
+    const { container } = render(<GoalieCard payload={payload} isExiting={false} />)
+    expect((container.firstChild as HTMLElement).className).toContain('card-enter')
+  })
+
+  it('applies card-exit class when exiting', () => {
+    const { container } = render(<GoalieCard payload={payload} isExiting={true} />)
+    expect((container.firstChild as HTMLElement).className).toContain('card-exit')
   })
 })

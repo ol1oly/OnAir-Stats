@@ -30,55 +30,56 @@ afterEach(() => { vi.useRealTimers() })
 
 describe('TeamCard — content', () => {
   it('renders the full team name', () => {
-    render(<TeamCard payload={payload} onExpire={() => {}} />)
+    render(<TeamCard payload={payload} isExiting={false} />)
     expect(screen.getByText('Edmonton Oilers')).toBeTruthy()
   })
 
   it('does NOT render the abbreviation as standalone text in the header', () => {
-    render(<TeamCard payload={payload} onExpire={() => {}} />)
+    render(<TeamCard payload={payload} isExiting={false} />)
     expect(screen.queryByText('EDM')).toBeNull()
   })
 
   it('renders division and conference ranks', () => {
-    render(<TeamCard payload={payload} onExpire={() => {}} />)
+    render(<TeamCard payload={payload} isExiting={false} />)
     expect(screen.getByText('Div: 2nd · Conf: 3rd')).toBeTruthy()
   })
 
   it('renders win-loss-OT record', () => {
-    render(<TeamCard payload={payload} onExpire={() => {}} />)
+    render(<TeamCard payload={payload} isExiting={false} />)
     expect(screen.getByText('42W')).toBeTruthy()
     expect(screen.getByText('20L')).toBeTruthy()
     expect(screen.getByText('5OT')).toBeTruthy()
   })
 
   it('renders points', () => {
-    render(<TeamCard payload={payload} onExpire={() => {}} />)
+    render(<TeamCard payload={payload} isExiting={false} />)
     expect(screen.getByText('89 PTS')).toBeTruthy()
   })
 })
 
 describe('TeamCard — logo', () => {
   it('renders img with logo_url as src', () => {
-    const { container } = render(<TeamCard payload={payload} onExpire={() => {}} />)
+    const { container } = render(<TeamCard payload={payload} isExiting={false} />)
     const img = container.querySelector('img')
     expect(img?.getAttribute('src')).toBe('https://example.com/edm.svg')
   })
 
   it('shows abbreviation fallback (EDM) in amber when image errors', () => {
-    const { container } = render(<TeamCard payload={payload} onExpire={() => {}} />)
+    const { container } = render(<TeamCard payload={payload} isExiting={false} />)
     fireEvent.error(container.querySelector('img')!)
     expect(container.querySelector('img')).toBeNull()
     expect(screen.getByText('EDM')).toBeTruthy()
   })
 })
 
-describe('TeamCard — lifecycle', () => {
-  it('calls onExpire after 8200ms', () => {
-    const onExpire = vi.fn()
-    render(<TeamCard payload={payload} onExpire={onExpire} />)
-    vi.advanceTimersByTime(8000)
-    expect(onExpire).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(200)
-    expect(onExpire).toHaveBeenCalledOnce()
+describe('TeamCard — animation', () => {
+  it('applies card-enter class when not exiting', () => {
+    const { container } = render(<TeamCard payload={payload} isExiting={false} />)
+    expect((container.firstChild as HTMLElement).className).toContain('card-enter')
+  })
+
+  it('applies card-exit class when exiting', () => {
+    const { container } = render(<TeamCard payload={payload} isExiting={true} />)
+    expect((container.firstChild as HTMLElement).className).toContain('card-exit')
   })
 })
