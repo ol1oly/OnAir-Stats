@@ -185,6 +185,35 @@ The mic start/stop button is a small floating pill in the top-right corner of th
 
 ---
 
+## Auto-refresh players.json (post-MVP)
+
+**Date:** 2026-03-27
+
+`players.json` is currently a static hand-curated file. It needs periodic updates as rosters change (trades, call-ups, retirements) and as new star players emerge.
+
+### Proposed approach
+
+A background job (`scripts/refresh_players.py`) that runs on a monthly cron (or on-demand via `POST /admin/refresh-players`) and:
+
+1. **Fetches all 32 team rosters** via `GET /v1/roster/{abbrev}/current` — gives the full active NHL roster with player IDs
+2. **Fetches stat leaders** via the NHL stats REST API (`api.nhle.com/stats/rest/en/skater/summary`) filtered to top N by points, and goalie equivalent for goalies
+3. **Merges into players.json** — adds new entries, updates IDs for existing names, does NOT remove entries (keeps historical players for fuzzy matching coverage)
+4. **Logs a diff** of added/updated/removed entries so the operator can review
+
+### Trigger options
+
+- **Scheduled:** a cron entry in `docker-compose.yml` or a system cron that hits `POST /admin/refresh-players` once a month
+- **On-demand:** streamer can trigger manually from a `/settings` admin panel before a big game
+- **Trade-deadline aware:** optionally bump frequency to weekly during the February trade deadline window
+
+### Notes
+
+- The refresh should be idempotent — safe to run at any time
+- Player IDs are permanent in the NHL system; only names need occasional normalization (accents, hyphenation)
+- Non-ASCII names (e.g. "Juraj Slafkovský") should be stored in ASCII form ("Juraj Slafkovsky") since the extractor strips diacritics during tokenization
+
+---
+
 # note from olivier
  - will probably need to refactor the test directory to use a standardized structure for the tests.
  - will probably need to add more variables in the env file to be able to configure easily the time slide and other good parameters. I noticed a lot of hardcoded variable in the code, will need to have opus at max to analyze the repo and suggest places to be able to easily modify critical variables
