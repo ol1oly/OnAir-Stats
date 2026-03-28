@@ -165,6 +165,26 @@ The cards currently render a hardcoded list of rows. With configurable fields:
 
 
 
+---
+
+## MIC control: Option A concerns (floating HUD in overlay)
+
+**Date:** 2026-03-27
+
+The mic start/stop button is a small floating pill in the top-right corner of the overlay canvas (Option A). This is the MVP approach.
+
+**Known concerns:**
+- The button is visible in the OBS broadcast output — it appears in the live stream.
+- Mixed concerns: the overlay is both the stats display and the control surface.
+- No way to hide the HUD short of pressing F11 or cropping the browser source in OBS.
+
+**Better long-term options:**
+- **Option B (separate /control route):** Pure transparent overlay at `/`; mic + status at `/control`. Streamer opens both tabs — one in OBS, one in browser. Requires React Router or a manual hash/pathname routing check.
+- **Option C (auto-start):** Recording starts automatically on page load (after mic permission). Zero UI visible in OBS. Downside: no pause/stop without closing the OBS source.
+- **Hybrid:** Keep Option A but add a keyboard shortcut (e.g., `H` key) to toggle HUD visibility so it can be hidden during live broadcasts.
+
+---
+
 # note from olivier
  - will probably need to refactor the test directory to use a standardized structure for the tests.
  - will probably need to add more variables in the env file to be able to configure easily the time slide and other good parameters. I noticed a lot of hardcoded variable in the code, will need to have opus at max to analyze the repo and suggest places to be able to easily modify critical variables

@@ -17,7 +17,9 @@
       "Bash(\"C:\\\\Bureau\\\\live_stats\\\\backend\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest \"C:\\\\Bureau\\\\live_stats\\\\backend\\\\tests\\\\test_server.py\" -v 2>&1)",
       "Bash(npm run:*)",
       "Bash(git:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(bash \"/c/Users/Olivier/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Bureau/live_stats\")",
+      "Bash(BRAINSTORM_PORT=3847 bash \"/c/Users/Olivier/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.6/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Bureau/live_stats\")"
     ]
   },
   "spinnerTipsEnabled": true,
