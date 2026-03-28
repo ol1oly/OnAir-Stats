@@ -46,7 +46,10 @@ cp .env.example .env
 ```bash
 cd backend
 python -m venv .venv               # skip if .venv already exists
-.venv/Scripts/python.exe -m pip install -r requirements.txt
+
+.venv/Scripts/python.exe -m pip install --quiet --upgrade pip setuptools wheel
+.venv/Scripts/python.exe -m pip install --quiet --only-binary=:all: pydantic-core
+.venv/Scripts/python.exe -m pip install --quiet -r requirements.txt"
 ```
 
 **3. Frontend:**
@@ -119,7 +122,7 @@ http://localhost:5173?debug
 
 **Working:** end-to-end pipeline (audio capture → transcription → extraction → stats → overlay cards), all card types, WebSocket auto-reconnect, 45s stat cache, fuzzy entity extraction, full test suite.
 
-**Planned:** Docker/`docker-compose.yml`, LLM extractor mode wiring, custom trigger system (`TriggerBuilder`, `TriggerCard`), team logo rendering.
+**Planned:** Docker/`docker-compose.yml`, LLM extractor mode wiring, custom trigger system (`TriggerBuilder`, `TriggerCard`).
 
 ## NHL API
 

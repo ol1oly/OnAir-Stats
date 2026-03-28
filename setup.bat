@@ -39,13 +39,23 @@ if not exist "%ROOT%\backend\.venv\Scripts\python.exe" (
 :: Install Python dependencies
 :: ---------------------------------------------------------------
 echo [....] Installing Python dependencies...
-"%ROOT%\backend\.venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
+
+"%ROOT%\backend\.venv\Scripts\python.exe" -m pip install --quiet --upgrade pip setuptools wheel
+if errorlevel 1 (
+    echo [ERROR] Failed to upgrade pip/setuptools/wheel
+    set ERRORS=1
+)
+
+echo [....] Installing requirements...
+
+"%ROOT%\backend\.venv\Scripts\python.exe" -m pip install --quiet --only-binary=:all: pydantic-core
 "%ROOT%\backend\.venv\Scripts\python.exe" -m pip install --quiet -r "%ROOT%\backend\requirements.txt"
+
 if errorlevel 1 (
     echo [ERROR] pip install failed. Check requirements.txt or your network connection.
     set ERRORS=1
 ) else (
-    echo [OK]    Python dependencies installed.
+    echo [OK] Python dependencies installed.
 )
 
 :: ---------------------------------------------------------------
