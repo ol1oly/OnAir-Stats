@@ -30,7 +30,10 @@ export function useMicCapture(audioWsUrl: string): {
     ws.onopen = () => {
       setIsConnected(true)
 
-      const recorder = new MediaRecorder(stream)
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : ''
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       recorderRef.current = recorder
 
       recorder.ondataavailable = (e) => {

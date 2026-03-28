@@ -42,6 +42,8 @@ class DeepgramTranscriber:
         self._connection: AsyncV1SocketClient | None = None
         self._listen_task: asyncio.Task | None = None
         self._ready = asyncio.Event()
+        self._stopped = False
+        self._reconnect_header: bytes | None = None
 
     async def start(self) -> None:
         """Open the Deepgram WebSocket and wait until the connection is live."""
@@ -49,44 +51,67 @@ class DeepgramTranscriber:
         self._listen_task = asyncio.create_task(self._run())
         await self._ready.wait()
 
+    def set_reconnect_header(self, blob: bytes) -> None:
+        """Cache the WebM initialization blob so it can be resent on every reconnect."""
+        self._reconnect_header = blob
+
     async def _run(self) -> None:
-        """Background task: hold the WS open and dispatch transcripts."""
-        try:
-            async with self._client.listen.v1.connect(
-                model="nova-2",
-                language="en",
-                punctuate="true",
-                interim_results="true",
-                encoding=self._encoding,
-                sample_rate=self._sample_rate,
-            ) as conn:
-                self._connection = conn
-                self._ready.set()
-                if self._on_ready:
-                    self._on_ready()
-                async for msg in conn:
-                    if not isinstance(msg, ListenV1Results):
-                        continue
-                    transcript = msg.channel.alternatives[0].transcript if msg.channel.alternatives else ""
-                    if not transcript:
-                        continue
-                    self._on_transcript(transcript, bool(msg.is_final))
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:
-            print(f"[transcriber] error: {exc}", file=sys.stderr, flush=True)
-            if self._on_error:
-                self._on_error(str(exc))
-        finally:
-            self._connection = None
+        """Background task: hold the WS open, reconnect on timeout/error."""
+        delay = 1.0
+        is_reconnect = False
+        while not self._stopped:
+            try:
+                async with self._client.listen.v1.connect(
+                    model="nova-2",
+                    language="en",
+                    punctuate="true",
+                    interim_results="true",
+                    encoding=self._encoding,
+                    sample_rate=self._sample_rate,
+                ) as conn:
+                    # On reconnect: inject the WebM header before accepting live audio.
+                    # MediaRecorder only emits the init segment once at the start of a stream;
+                    # without it Deepgram cannot parse subsequent cluster data.
+                    if is_reconnect and self._reconnect_header is not None:
+                        await conn.send_media(self._reconnect_header)
+                    is_reconnect = True
+                    self._connection = conn  # expose only after header is sent
+                    delay = 1.0  # reset backoff on successful connect
+                    self._ready.set()
+                    if self._on_ready:
+                        self._on_ready()
+                    async for msg in conn:
+                        if not isinstance(msg, ListenV1Results):
+                            continue
+                        transcript = msg.channel.alternatives[0].transcript if msg.channel.alternatives else ""
+                        if not transcript:
+                            continue
+                        self._on_transcript(transcript, bool(msg.is_final))
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                if self._stopped:
+                    break
+                print(f"[transcriber] error: {exc} — reconnecting in {delay:.0f}s", file=sys.stderr, flush=True)
+                if self._on_error:
+                    self._on_error(str(exc))
+                self._ready.clear()
+                self._connection = None
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 30.0)
+        self._connection = None
 
     async def send_audio(self, blob: bytes) -> None:
         """Forward a raw audio blob to Deepgram."""
         if self._connection is not None:
-            await self._connection.send_media(blob)
+            try:
+                await self._connection.send_media(blob)
+            except Exception:
+                pass  # connection dropped mid-stream; reconnect loop handles it
 
     async def stop(self) -> None:
         """Signal end-of-stream to Deepgram and shut down gracefully."""
+        self._stopped = True
         if self._connection is not None:
             try:
                 await self._connection.send_close_stream()

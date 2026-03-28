@@ -147,9 +147,15 @@ app = FastAPI(lifespan=lifespan)
 @app.websocket("/audio")
 async def audio_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
+    first_blob = True
     try:
         while True:
             blob = await websocket.receive_bytes()
+            if first_blob and _transcriber is not None:
+                # Cache the WebM initialization segment so the transcriber can
+                # replay it to Deepgram on every reconnect.
+                _transcriber.set_reconnect_header(blob)
+                first_blob = False
             if _transcriber is not None:
                 await _transcriber.send_audio(blob)
     except WebSocketDisconnect:
