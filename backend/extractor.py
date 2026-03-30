@@ -9,12 +9,9 @@ from pathlib import Path
 
 from rapidfuzz import fuzz, process
 
-DATA_DIR = Path(__file__).parent
+from config import FUZZY_MIN_WORD_LEN, FUZZY_NGRAM_THRESHOLD, FUZZY_PARTIAL_THRESHOLD
 
-# Score thresholds
-_NGRAM_THRESHOLD = 82    # fuzz.ratio cutoff for n-gram window pass
-_PARTIAL_THRESHOLD = 90  # fuzz.partial_ratio cutoff for surname pass
-_MIN_WORD_LEN = 4        # skip trivially short words in the partial pass
+DATA_DIR = Path(__file__).parent
 
 
 class Extractor:
@@ -66,7 +63,7 @@ class Extractor:
                     gram,
                     self._player_names_lower,
                     scorer=fuzz.ratio,
-                    score_cutoff=_NGRAM_THRESHOLD,
+                    score_cutoff=FUZZY_NGRAM_THRESHOLD,
                 )
                 if p_hit:
                     found_players.add(self._player_names[p_hit[2]])
@@ -75,7 +72,7 @@ class Extractor:
                     gram,
                     self._team_names_lower,
                     scorer=fuzz.ratio,
-                    score_cutoff=_NGRAM_THRESHOLD,
+                    score_cutoff=FUZZY_NGRAM_THRESHOLD,
                 )
                 if t_hit:
                     found_teams.add(self._team_abbrevs[t_hit[2]])
@@ -84,13 +81,13 @@ class Extractor:
         # Catches commentary-style last-name-only mentions, e.g. "McDavid" or "Pastrnak".
         # Teams are intentionally excluded here — their aliases are handled by pass 1.
         for word in words:
-            if len(word) < _MIN_WORD_LEN:
+            if len(word) < FUZZY_MIN_WORD_LEN:
                 continue
             p_hit = process.extractOne(
                 word,
                 self._player_names_lower,
                 scorer=fuzz.partial_ratio,
-                score_cutoff=_PARTIAL_THRESHOLD,
+                score_cutoff=FUZZY_PARTIAL_THRESHOLD,
             )
             if p_hit:
                 found_players.add(self._player_names[p_hit[2]])

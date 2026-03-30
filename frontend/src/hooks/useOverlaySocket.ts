@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { WS_BACKOFF_MS } from '../config'
 import type { Envelope, StatPayload, SystemPayload } from '../types/payloads'
-
-// Backoff delays in ms: 1s, 2s, 4s, then cap at 5s
-const BACKOFF_MS = [1000, 2000, 4000, 5000]
 
 export function useOverlaySocket(url: string): {
   latestPayload: StatPayload | null
@@ -47,7 +45,7 @@ export function useOverlaySocket(url: string): {
     ws.onclose = () => {
       setIsConnected(false)
       if (!activeRef.current) return
-      const delay = BACKOFF_MS[Math.min(retryRef.current, BACKOFF_MS.length - 1)]
+      const delay = WS_BACKOFF_MS[Math.min(retryRef.current, WS_BACKOFF_MS.length - 1)]
       retryRef.current++
       timerRef.current = setTimeout(connect, delay)
     }

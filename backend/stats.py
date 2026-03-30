@@ -8,10 +8,16 @@ from typing import TypedDict
 import httpx
 from rapidfuzz import fuzz, process
 
-DATA_DIR = Path(__file__).parent
+from config import (
+    NHL_API_BASE,
+    NHL_CACHE_TTL,
+    NHL_HTTP_TIMEOUT,
+    NHL_LOGO_TEMPLATE,
+    NHL_SEARCH_URL,
+    SEARCH_MATCH_THRESHOLD,
+)
 
-_NHL_BASE = "https://api-web.nhle.com/v1"
-_CACHE_TTL = 45.0  # seconds
+DATA_DIR = Path(__file__).parent
 
 
 # ---------------------------------------------------------------------------
@@ -131,8 +137,6 @@ def lookup_team_abbrev(name: str) -> str | None:
 # Live NHL search API — resolve any player name to an ID
 # ---------------------------------------------------------------------------
 
-_SEARCH_URL = "https://search.d3.nhle.com/api/v1/search/player"
-_SEARCH_THRESHOLD = 85  # minimum fuzz.ratio score for fuzzy name fallback
 
 
 async def search_player_id(name: str, active: bool | None = True) -> int | None:
@@ -150,9 +154,9 @@ async def search_player_id(name: str, active: bool | None = True) -> int | None:
     Never raises — returns None on any network or parse error.
     """
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT) as client:
             resp = await client.get(
-                _SEARCH_URL,
+                NHL_SEARCH_URL,
                 params={"culture": "en-us", "active" : active,"limit": 20, "q": name},
             )
             resp.raise_for_status()
@@ -177,7 +181,7 @@ async def search_player_id(name: str, active: bool | None = True) -> int | None:
     # Fuzzy fallback — partial_ratio handles surname-only input (e.g. "mcdavid" in "Connor McDavid")
     # Compare lowercased to avoid case sensitivity issues
     names_lower = [r.get("name", "").lower() for r in results]
-    hit = process.extractOne(name.lower(), names_lower, scorer=fuzz.partial_ratio, score_cutoff=_SEARCH_THRESHOLD)
+    hit = process.extractOne(name.lower(), names_lower, scorer=fuzz.partial_ratio, score_cutoff=SEARCH_MATCH_THRESHOLD)
     if hit:
         return int(results[hit[2]]["playerId"])
 
@@ -211,7 +215,7 @@ class StatsClient:
 
     def _cache_get(self, key: str) -> dict | None:
         entry = self._cache.get(key)
-        if entry and time.monotonic() - entry[0] < _CACHE_TTL:
+        if entry and time.monotonic() - entry[0] < NHL_CACHE_TTL:
             return entry[1]
         return None
 
@@ -233,8 +237,8 @@ class StatsClient:
             return cached
 
         try:
-            async with httpx.AsyncClient(timeout=5, follow_redirects=True) as client:
-                resp = await client.get(f"{_NHL_BASE}/player/{player_id}/landing")
+            async with httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True) as client:
+                resp = await client.get(f"{NHL_API_BASE}/player/{player_id}/landing")
                 resp.raise_for_status()
                 data = resp.json()
         except Exception:
@@ -288,8 +292,8 @@ class StatsClient:
         standings = self._cache_get("standings")
         if standings is None:
             try:
-                async with httpx.AsyncClient(timeout=5, follow_redirects=True) as client:
-                    resp = await client.get(f"{_NHL_BASE}/standings/now")
+                async with httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True) as client:
+                    resp = await client.get(f"{NHL_API_BASE}/standings/now")
                     resp.raise_for_status()
                     standings = resp.json()
             except Exception:
@@ -313,7 +317,7 @@ class StatsClient:
             extracted = {
                 "name": team_entry["teamName"]["default"],
                 "abbrev": team_entry["teamAbbrev"]["default"],
-                "logo_url": f"https://assets.nhle.com/logos/nhl/svg/{abbrev_upper}_light.svg",
+                "logo_url": NHL_LOGO_TEMPLATE.format(abbrev=abbrev_upper),
                 "stats": {
                     "season": str(team_entry["seasonId"]),
                     "wins": team_entry["wins"],

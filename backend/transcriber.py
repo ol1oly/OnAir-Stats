@@ -5,6 +5,7 @@ import os
 import sys
 from typing import Callable
 
+from config import DEEPGRAM_LANGUAGE, DEEPGRAM_MODEL, DEEPGRAM_RECONNECT_MAX_DELAY
 from deepgram import AsyncDeepgramClient
 from deepgram.listen.v1.socket_client import AsyncV1SocketClient
 from deepgram.listen.v1.types.listen_v1results import ListenV1Results
@@ -62,8 +63,8 @@ class DeepgramTranscriber:
         while not self._stopped:
             try:
                 async with self._client.listen.v1.connect(
-                    model="nova-2",
-                    language="en",
+                    model=DEEPGRAM_MODEL,
+                    language=DEEPGRAM_LANGUAGE,
                     punctuate="true",
                     interim_results="true",
                     encoding=self._encoding,
@@ -98,7 +99,7 @@ class DeepgramTranscriber:
                 self._ready.clear()
                 self._connection = None
                 await asyncio.sleep(delay)
-                delay = min(delay * 2, 30.0)
+                delay = min(delay * 2, DEEPGRAM_RECONNECT_MAX_DELAY)
         self._connection = None
 
     async def send_audio(self, blob: bytes) -> None:

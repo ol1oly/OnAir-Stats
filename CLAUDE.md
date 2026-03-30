@@ -8,19 +8,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current Implementation State
 
-The project is in active development. Backend pipeline stub is wired; frontend overlay components and hooks are built but the backend `_on_transcript()` pipeline is not yet connected.
+The core pipeline is fully wired end-to-end: audio → Deepgram → extractor → stats → broadcast.
 
 **Implemented:**
 - `backend/transcriber.py` — Deepgram WebSocket streaming transcriber
 - `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode partially wired
 - `backend/stats.py` — `StatsClient` with 45s in-memory cache; `get_player()` (skater + goalie) and `get_team()` (standings) fully implemented
-- `backend/server.py` — FastAPI app; `_on_transcript()` is still a stub (pipeline not yet wired)
-- `frontend/src/components/` — `OverlayCanvas`, `StatCard`, `GoalieCard`, `TeamCard` (all built with Tailwind + slide-in animations)
+- `backend/server.py` — FastAPI app; `_on_transcript()` pipeline fully wired (transcript → extract → stats → broadcast)
+- `frontend/src/App.tsx` — root component; wires `useMicCapture` to `OverlayCanvas` + `MicHud`
+- `frontend/src/components/` — `OverlayCanvas`, `StatCard`, `GoalieCard`, `TeamCard`, `MicHud` (all built with Tailwind + slide-in animations)
 - `frontend/src/hooks/` — `useOverlaySocket.ts` (WS hook with auto-reconnect), `useMicCapture.ts` (getUserMedia + MediaRecorder)
 - `frontend/src/types/payloads.ts` — full TypeScript payload types for all message shapes
 - Tests: `backend/tests/` (pytest) and `frontend/src/components/__tests__/` + `frontend/src/hooks/__tests__/` (Vitest + Testing Library)
 
-**Not yet built:** Docker / `docker-compose.yml`, `main.py`, trigger system (`trigger_resolver.py`, `trigger_store.py`, `trigger_runner.py`), `TriggerCard.tsx`, `TriggerBuilder.tsx`, `TriggerList.tsx`, mic control UI (MIC-02), backend `_on_transcript()` pipeline wiring.
+**Not yet built:** Docker / `docker-compose.yml`, `main.py`, trigger system (`trigger_resolver.py`, `trigger_store.py`, `trigger_runner.py`), `TriggerCard.tsx`, `TriggerBuilder.tsx`, `TriggerList.tsx`.
 
 ## Development
 
@@ -37,7 +38,7 @@ backend/.venv/Scripts/python.exe -m uvicorn server:app --reload --port 8000
 Run tests:
 ```bash
 backend/.venv/Scripts/python.exe -m pytest tests/
-backend/.venv/Scripts/python.exe -m pytest tests/test_server.py -v
+backend/.venv/Scripts/python.exe -m pytest tests/test_server.py -v   # single file
 ```
 
 ### Python Dependencies
@@ -54,6 +55,7 @@ npm run dev       # dev server at http://localhost:5173
 npm run build     # outputs dist/ (required before serving from backend)
 npm run lint
 npm run test      # Vitest (jsdom environment)
+npx vitest run src/components/__tests__/StatCard.test.tsx   # single file
 ```
 
 **Tests:**
@@ -65,6 +67,10 @@ backend/.venv/Scripts/python.exe -m pytest tests/test_stats.py -v
 # Frontend (from frontend/)
 npm run test
 ```
+
+**When changing a function's output format** (payload shape, response structure, field names): grep for the function/endpoint across ALL test files — including `tests/test_*_live.py` which are excluded from pytest but still assert on real output. Run those scripts, and update any test that fails due to the format change. Do not assume pytest passing is sufficient coverage.
+
+**Test gotcha — `frontend/dist` must exist before importing `server.py`:** The FastAPI `StaticFiles` mount raises at import time if the directory is missing. The test suite creates a minimal placeholder automatically (`conftest.py`), but if you add new test files that import `server` directly, ensure `frontend/dist/` exists first.
 
 **Standalone module tests (no server needed):**
 ```bash
@@ -85,6 +91,9 @@ GEMINI_API_KEY=
 EXTRACTOR_MODE=llm    # "llm" or "fuzzy"
 ```
 
+- If `DEEPGRAM_API_KEY` is missing the server still starts; `/debug/inject` and WS `/ws` work normally — useful for offline UI development.
+- `EXTRACTOR_MODE=llm` is plumbed (env var + packages installed) but **not yet implemented** — only `"fuzzy"` runs regardless of this setting.
+
 ## Architecture
 
 Audio is captured in the browser (no mic drivers or Docker device passthrough needed) and streamed to the backend over WebSocket.
@@ -97,6 +106,15 @@ Browser mic (getUserMedia + MediaRecorder)
 → FastAPI WS /ws → React OverlayCanvas → StatCard / TeamCard
 ```
 
+### Configuration
+
+**Any tunable constant (timeout, threshold, URL, limit, interval, model name) MUST live in a config file — never hardcoded inline in a module.** This is a strict rule for this project.
+
+- **Backend:** `backend/config.py` — NHL API URLs, HTTP timeout, cache TTL, fuzzy matching thresholds, Deepgram model/language/reconnect settings. All plain Python constants grouped by domain. Secrets (API keys) stay in `.env`.
+- **Frontend:** `frontend/src/config.ts` — WebSocket URLs, card display timer, max visible cards, dedup window, mic timeslice, reconnect backoff. Exported TS constants. Tailwind visual classes (colors, sizes) stay inline in components.
+
+When adding a new feature or module, if it introduces any value that could reasonably be tuned in production (e.g. a polling interval, a retry count, a batch size, an API endpoint), add it to the appropriate config file with a descriptive comment — do not define it locally in the module.
+
 ### Backend (`backend/`)
 
 | File | Role |
@@ -105,7 +123,7 @@ Browser mic (getUserMedia + MediaRecorder)
 | `transcriber.py` | Receives audio blobs from `WS /audio`, pipes to Deepgram; fires `on_transcript` for final segments only |
 | `extractor.py` | Dual-mode: `"llm"` (Claude/Gemini) or `"fuzzy"` (RapidFuzz n-gram). Returns `{ players: [], teams: [] }` |
 | `stats.py` | NHL API fetches with 45s in-memory cache. `players.json` maps names→IDs; `teams.json` maps names/aliases→abbreviations |
-| `server.py` | FastAPI app; `GET /` serves React build, `WS /audio` receives browser audio, `WS /ws` broadcasts stat JSON. **`_on_transcript()` is currently a stub** — the transcript→extract→stats→broadcast pipeline is not yet wired |
+| `server.py` | FastAPI app; `GET /` serves React build, `WS /audio` receives browser audio, `WS /ws` broadcasts stat JSON, `POST /debug/inject` manually injects a stat payload for testing |
 | `trigger_resolver.py` | *(planned)* One-time LLM call to resolve NHL API endpoint + fields |
 | `trigger_store.py` | *(planned)* In-memory + JSON persistence for custom triggers |
 | `trigger_runner.py` | *(planned)* Runtime keyword matching + HTTP fetch + field extraction |
@@ -121,6 +139,7 @@ Browser mic (getUserMedia + MediaRecorder)
 | `components/StatCard.tsx` | Skater stat card; slide-in, 8s auto-dismiss; goals=red, assists=blue |
 | `components/GoalieCard.tsx` | Goalie stat card; teal accent |
 | `components/TeamCard.tsx` | Team stat card; gold/amber accent |
+| `components/MicHud.tsx` | Recording control HUD (top-right); WS connection indicator + start/stop button |
 | `TriggerCard.tsx` | *(planned)* Custom trigger card; purple/violet accent |
 | `TriggerBuilder.tsx` | *(planned)* UI to create custom triggers with LLM-resolved endpoint preview |
 | `TriggerList.tsx` | *(planned)* List/toggle/delete saved custom triggers |
@@ -151,6 +170,44 @@ Base: `https://api-web.nhle.com/v1/`
 - `backend/players.json` — `{ "Connor McDavid": 8478402, ... }` (~50 seeded players)
 - `backend/teams.json` — `{ "Edmonton Oilers": "EDM", "Oilers": "EDM", ... }` (all 32 teams + common aliases)
 - `backend/triggers.json` — *(planned)* persisted custom triggers
+
+Both JSON files are loaded once at startup; changes require a server restart.
+
+**To add a new player:** add `"First Last": NHL_PLAYER_ID` to `players.json` — no code changes needed. The extractor will match both full-name and surname-only mentions automatically.
+
+## Development Workflows
+
+**Local dev (two processes):**
+```bash
+# Terminal 1 — backend
+cd backend && ../.venv/Scripts/python.exe -m uvicorn server:app --reload --port 8000
+
+# Terminal 2 — frontend hot-reload
+cd frontend && npm run dev   # http://localhost:5173
+```
+`npm run build` is only needed when serving the frontend through the backend at port 8000.
+
+**Injecting a stat payload without a microphone:**
+```bash
+# Player by name
+curl -X POST http://localhost:8000/debug/inject \
+  -H "Content-Type: application/json" \
+  -d '{"type": "player", "name": "Connor McDavid"}'
+
+# Team by abbreviation
+curl -X POST http://localhost:8000/debug/inject \
+  -H "Content-Type: application/json" \
+  -d '{"type": "team", "abbrev": "EDM"}'
+```
+
+**Adding a new card type:**
+1. Add a new payload type to `frontend/src/types/payloads.ts`
+2. Create the card component in `frontend/src/components/`
+3. Register it in `OverlayCanvas.tsx` — the `CardWrapper` render block is where `payload.type` is switched on
+4. Add the corresponding payload builder in `backend/stats.py` and wire it in `_handle_transcript()` in `server.py`
+5. Keep payload shape in sync between `types/payloads.ts` and the Python TypedDict in `stats.py`
+
+**Debugging overlay cards:** append `?debug` to the OBS browser source URL to show an 8-second countdown badge on each visible card. Useful for verifying dedup and timer-reset behaviour.
 
 ## Docker (planned)
 

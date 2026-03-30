@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, fireEvent } from '@testing-library/react'
+import { CARD_DISPLAY_MS, CARD_EXIT_MS, DEDUP_MS } from '../../config'
 import { OverlayCanvas } from '../OverlayCanvas'
 import type { PlayerPayload, GoaliePayload, TeamPayload } from '../../types/payloads'
 
@@ -79,10 +80,11 @@ describe('OverlayCanvas — deduplication', () => {
   it('adds a new card after prior card expires and dedup window passes', () => {
     const { rerender } = render(<OverlayCanvas />)
     act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
-    // card expires at 8200ms, dedup window (2000ms) ends at 10200ms
-    act(() => { vi.advanceTimersByTime(10201) })
+    // card expires at CARD_DISPLAY_MS + CARD_EXIT_MS, dedup window (DEDUP_MS) ends after that
+    const reappearDelay = CARD_DISPLAY_MS + CARD_EXIT_MS + DEDUP_MS + 1
+    act(() => { vi.advanceTimersByTime(reappearDelay) })
     act(() => {
-      mockLatestPayload = { ...player, ts: player.ts + 10201 }
+      mockLatestPayload = { ...player, ts: player.ts + reappearDelay }
       rerender(<OverlayCanvas />)
     })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
@@ -127,11 +129,11 @@ describe('OverlayCanvas — max cards', () => {
 })
 
 describe('OverlayCanvas — timer', () => {
-  it('removes card after 8200ms', () => {
+  it(`removes card after ${CARD_DISPLAY_MS + CARD_EXIT_MS}ms`, () => {
     const { rerender } = render(<OverlayCanvas />)
     act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
-    act(() => { vi.advanceTimersByTime(8201) })
+    act(() => { vi.advanceTimersByTime(CARD_DISPLAY_MS + CARD_EXIT_MS + 1) })
     expect(screen.queryByText('Connor McDavid')).toBeNull()
   })
 

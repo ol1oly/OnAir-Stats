@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { MIC_TIMESLICE_MS } from '../config'
 
 export function useMicCapture(audioWsUrl: string): {
   start: () => Promise<void>
@@ -42,7 +43,7 @@ export function useMicCapture(audioWsUrl: string): {
         }
       }
 
-      recorder.start(250) // ~250ms batching interval — Deepgram determines transcript boundaries via is_final
+      recorder.start(MIC_TIMESLICE_MS)
       setIsRecording(true)
     }
 

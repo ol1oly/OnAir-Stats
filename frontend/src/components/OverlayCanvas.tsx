@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { WS_OVERLAY_URL, MAX_CARDS, DEDUP_MS, CARD_DISPLAY_MS, CARD_EXIT_MS } from '../config'
 import { useOverlaySocket } from '../hooks/useOverlaySocket'
 import type { StatPayload } from '../types/payloads'
 import { StatCard } from './StatCard'
 import { GoalieCard } from './GoalieCard'
 import { TeamCard } from './TeamCard'
-
-const WS_URL = 'ws://localhost:8000/ws'
-const MAX_CARDS = 3
-const DEDUP_MS = 2000
 const DEBUG = new URLSearchParams(location.search).has('debug')
 
 type CardItem = { id: string; payload: StatPayload; resetKey: number }
@@ -31,9 +28,9 @@ function cardId(p: StatPayload): string {
 // ---------------------------------------------------------------------------
 
 function DebugCountdown({ resetKey }: { resetKey: number }) {
-  const [secondsLeft, setSecondsLeft] = useState(8)
+  const [secondsLeft, setSecondsLeft] = useState(CARD_DISPLAY_MS / 1000)
   useEffect(() => {
-    setSecondsLeft(8)
+    setSecondsLeft(CARD_DISPLAY_MS / 1000)
     const interval = setInterval(() => setSecondsLeft(s => s - 1), 1000)
     return () => clearInterval(interval)
   }, [resetKey])
@@ -63,8 +60,8 @@ function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
     setIsExiting(false)
     const outer = setTimeout(() => {
       setIsExiting(true)
-      setTimeout(onExpire, 200)
-    }, 8000)
+      setTimeout(onExpire, CARD_EXIT_MS)
+    }, CARD_DISPLAY_MS)
     return () => clearTimeout(outer)
   }, [item.resetKey, onExpire])
 
@@ -86,7 +83,7 @@ function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
 // ---------------------------------------------------------------------------
 
 export function OverlayCanvas() {
-  const { latestPayload } = useOverlaySocket(WS_URL)
+  const { latestPayload } = useOverlaySocket(WS_OVERLAY_URL)
   const [cards, setCards] = useState<CardItem[]>([])
   const seenRef = useRef<Map<string, number>>(new Map())
 

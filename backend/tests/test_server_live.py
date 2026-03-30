@@ -172,9 +172,11 @@ def test_ws_connected_event() -> Result:
     try:
         with TestClient(server.app) as client:
             with client.websocket_connect("/ws") as ws:
-                msg = ws.receive_json()
+                envelope = ws.receive_json()
+                msg = envelope.get("payload", {})
 
         r.elapsed = time.perf_counter() - t0
+        _check(r, envelope.get("v") == 1,                    "envelope v == 1")
         _check(r, msg.get("type")    == "system",            "type == 'system'")
         _check(r, msg.get("event")   == "connected",         "event == 'connected'")
         _check(r, msg.get("message") == "Overlay connected", "message == 'Overlay connected'")
