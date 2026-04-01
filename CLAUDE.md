@@ -209,6 +209,10 @@ curl -X POST http://localhost:8000/debug/inject \
 
 **Debugging overlay cards:** append `?debug` to the OBS browser source URL to show an 8-second countdown badge on each visible card. Useful for verifying dedup and timer-reset behaviour.
 
+## Docs Folder
+
+Whenever you create a new file in `docs/`, add an entry for it in `docs/README.md` under the appropriate subfolder section — one line is enough.
+
 ## Docker (planned)
 
 - Default: only `backend` runs; FastAPI serves the pre-built React `dist/` at `GET /`

@@ -1,5 +1,7 @@
 # NHL Radio Overlay — Architecture Plan
 
+> Architecture decisions, stack rationale, and system diagram for the NHL Radio Overlay.
+
 ## Stack Decision
 
 | Layer | Choice | Reason |

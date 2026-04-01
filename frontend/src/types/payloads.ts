@@ -69,6 +69,11 @@ export type TriggerPayload = {
   ts: number
 }
 
+// ─── Future StatPayload types ──────────────────────────────────────────────
+// Add new payload discriminators here and include them in the StatPayload union.
+// See docs/project/future-payloads.md for the full checklist and idea backlog.
+// ──────────────────────────────────────────────────────────────────────────
+
 export type SystemPayload = {
   type: 'system'
   event: 'connected' | 'disconnected' | 'transcriber_ready' | 'transcriber_error'

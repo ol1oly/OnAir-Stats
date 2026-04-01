@@ -1,5 +1,7 @@
 # New API Documentation
 
+> Endpoint reference for the newer api-web.nhle.com v1 API, discovered and documented by the community.
+
 The NHL has surprised us all with a new API, so that means a new file to track all the parts of it people have discovered so far.
 
 `https://api-web.nhle.com/v1/`

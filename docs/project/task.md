@@ -19,13 +19,13 @@ Derived from `plan.md`. Each task is atomic, completable in under 2 hours, and o
 
 ### MIC CAPTURE — `frontend/src/useMicCapture.ts`
 
-- [ ] **MIC-01** — Implement `useMicCapture(audioWsUrl: string)` hook:
+- [X] **MIC-01** — Implement `useMicCapture(audioWsUrl: string)` hook:
   - Call `navigator.mediaDevices.getUserMedia({ audio: true })` on start
   - Open a WebSocket to `ws://localhost:8000/audio`
   - Use `MediaRecorder` with a 3s `timeslice` to emit audio blobs
   - Send each blob as binary over the WebSocket on `ondataavailable`
   - Expose `{ start(), stop(), isRecording: boolean, isConnected: boolean }`
-- [ ] **MIC-02** — Add a mic control button to the overlay UI (start/stop recording, connection status indicator)
+- [X] **MIC-02** — Add a mic control button to the overlay UI (start/stop recording, connection status indicator)
 - [ ] **MIC-03** — Test in OBS browser source: confirm mic access is granted and blobs are received by the backend
 
 ---
@@ -252,6 +252,42 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 
 ---
 
+---
+
+### ENTRY POINT — `backend/main.py`
+
+- [ ] **MAIN-01** — `backend/main.py`: standalone entry point for running the pipeline without a browser (e.g. direct mic via CLI or audio file); wires `DeepgramTranscriber` → `extract_entities()` → `StatsClient` → print/broadcast; useful for local testing outside OBS
+
+---
+
+### SYSTEM PAYLOAD — Frontend notifications
+
+- [ ] **SYS-01** — Frontend: show visual feedback for `transcriber_ready` and `transcriber_error` system events; currently only the WS connection dot in MicHud responds; add a status line or brief toast so the user knows when Deepgram connects or fails
+
+---
+
+### TRIGGER SYSTEM — `backend/trigger_*.py` + `frontend/src/components/Trigger*.tsx`
+
+See `docs/project/trigger-builder.md` for the full spec.
+
+- [ ] **TRIG-01** — `backend/trigger_store.py`: `TriggerRecord` TypedDict + in-memory store + `triggers.json` persistence (`create`, `list_all`, `get`, `update`, `delete`)
+- [ ] **TRIG-02** — `backend/specs/`: copy `docs/api/nhlAPIDocumentation.md` and `docs/api/new-api.md` as `api_spec_A.md` and `api_spec_B.md` — these are the resolver's API knowledge base
+- [ ] **TRIG-03** — `backend/trigger_resolver.py`: LLM resolution at creation time — load spec files, prefilter sections by keyword overlap, call Claude, validate + return `{ endpoint, method, path_params, fields, notes }`
+- [ ] **TRIG-04** — `backend/trigger_runner.py` (MVP single-step): `match_triggers(text, triggers)` (RapidFuzz ≥85), `run_trigger(trigger)` (URL substitution → httpx GET → dot-notation field extraction), `build_trigger_payload(trigger, values)` → `TriggerPayload`
+- [ ] **TRIG-05** — `backend/server.py`: add 4 REST routes — `POST /triggers`, `GET /triggers`, `PATCH /triggers/{id}`, `DELETE /triggers/{id}`
+- [ ] **TRIG-06** — `backend/server.py`: wire `match_triggers()` + `run_trigger()` into `_handle_transcript()` after `extract_entities()`; broadcast each result
+- [ ] **TRIG-07** — `frontend/src/hooks/useTriggers.ts`: REST hook for CRUD on `/triggers` — `create()`, `list()`, `toggle(id, enabled)`, `remove(id)`
+- [ ] **TRIG-08** — `frontend/src/components/TriggerCard.tsx`: overlay card with purple/violet accent, label/value field list, 8s auto-dismiss, slide-in animation
+- [ ] **TRIG-09** — `frontend/src/components/TriggerBuilder.tsx`: keyword tag input + description textarea; on submit calls `POST /triggers` and shows resolved endpoint preview before final save
+- [ ] **TRIG-10** — `frontend/src/components/TriggerList.tsx`: list saved triggers with description + keywords, toggle enabled/disabled, delete
+- [ ] **TRIG-11** — `frontend/src/components/OverlayCanvas.tsx`: register `<TriggerCard>` in `CardWrapper` for `payload.type === 'trigger'`
+- [ ] **TRIG-12** — Tests: `backend/tests/test_trigger_store.py` (CRUD + JSON persistence round-trip) and `test_trigger_runner.py` (keyword match, field extraction, disabled-trigger skip, no-match)
+- [ ] **TRIG-13** — *(post-MVP — this task requires further iteration)* Contextual input slots: `<team>` / `<player>` typed placeholders in trigger keywords filled from `extract_entities()` at runtime — see trigger-builder.md §"Contextual Input Slots"
+- [ ] **TRIG-14** — *(post-MVP — this task requires further iteration)* Chained endpoint operations: replace single `endpoint`/`fields` with a `steps[]` list; intermediate steps use `extract` to pass variables downstream — see trigger-builder.md §"Chained Endpoint Operations"
+- [ ] **TRIG-15** — *(post-MVP — this task requires further iteration)* Trigger composition: steps can be `trigger_ref` referencing another saved trigger; resolver receives a trigger library summary for reuse — see trigger-builder.md §"Trigger Composition"
+
+---
+
 ## Optional Enhancements (post-MVP)
 
 - [ ] **OPT-01** — Expand `players.json` to full NHL roster via a one-time script hitting the NHL API roster endpoint
@@ -279,3 +315,7 @@ Reference: https://gitlab.com/dword4/nhlapi/-/blob/master/new-api.md
 | Root + Build | ROOT-01 → 03 | Day 2 PM |
 | Docker | DOCK-01 → 06 | Day 2 PM |
 | Integration | INT-01 → 06 | Day 2 PM/Eve |
+| Entry point | MAIN-01 | — |
+| System payload | SYS-01 | — |
+| Trigger system (MVP) | TRIG-01 → 12 | — |
+| Trigger system (post-MVP) | TRIG-13 → 15 | — |

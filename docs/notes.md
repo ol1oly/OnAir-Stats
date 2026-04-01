@@ -1,5 +1,7 @@
 # Notes
 
+> Freeform notes and advanced feature ideas not yet in the formal task list.
+
 ---
 
 ## Keyword-based action extraction in `extract_entities`
