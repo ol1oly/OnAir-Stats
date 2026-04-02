@@ -24,7 +24,9 @@
       "Bash(backend/.venv/Scripts/python.exe -m pytest tests/ -v 2>&1)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/ -v)",
       "Bash(find /c/Bureau/live_stats -name *.md -type f)",
-      "Bash(find /c/Bureau/live_stats -maxdepth 2 -name *.py -type f)"
+      "Bash(find /c/Bureau/live_stats -maxdepth 2 -name *.py -type f)",
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py backend/tests/test_stats.py -v)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_stats.py tests/test_server.py -v)"
     ]
   },
   "spinnerTipsEnabled": true,
