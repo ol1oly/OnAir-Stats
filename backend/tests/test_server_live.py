@@ -13,11 +13,9 @@ runner makes timing visible and keeps the regular pytest suite fast.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
 # Allow importing backend modules directly
@@ -28,6 +26,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from transcriber import DeepgramTranscriber
+from live_helpers import Result, check as _check, timed as _timed, print_results as _print_results
 
 # ---------------------------------------------------------------------------
 # Pre-flight: need a real key
@@ -37,33 +36,6 @@ api_key = os.environ.get("DEEPGRAM_API_KEY", "")
 if not api_key:
     print("ERROR: DEEPGRAM_API_KEY not set in .env — live tests require a real key.")
     sys.exit(1)
-
-
-# ---------------------------------------------------------------------------
-# Result container + helpers  (same pattern as test_stats_live.py)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Result:
-    name:    str
-    ok:      bool  = True
-    elapsed: float = 0.0
-    error:   str   = ""
-    notes:   list[str] = field(default_factory=list)
-
-
-def _check(r: Result, condition: bool, msg: str) -> None:
-    if not condition:
-        r.ok = False
-        r.notes.append(f"FAIL  {msg}")
-    else:
-        r.notes.append(f"pass  {msg}")
-
-
-async def _timed(coro) -> tuple:
-    t0 = time.perf_counter()
-    value = await coro
-    return value, time.perf_counter() - t0
 
 
 # ---------------------------------------------------------------------------
@@ -202,41 +174,6 @@ async def _run_async() -> list[Result]:
     results.append(await test_transcriber_on_ready())
     results.append(await test_transcriber_on_error())
     return results
-
-
-def _print_results(all_results: list[Result]) -> int:
-    col_w = max(len(r.name) for r in all_results) + 2
-    sep   = "-" * (col_w + 52)
-
-    print(f"\n{sep}")
-    print(f"  {'Test':<{col_w}}  {'Status':<8}  {'Time':>9}  Notes")
-    print(sep)
-
-    failed = 0
-    for r in all_results:
-        status   = "PASS" if r.ok else "FAIL"
-        time_str = f"{r.elapsed * 1000:>8.1f}ms"
-        print(f"  {r.name:<{col_w}}  {status:<8}  {time_str}", end="")
-
-        if r.error:
-            print(f"  => {r.error}")
-        elif not r.ok:
-            print()
-            for note in r.notes:
-                if note.startswith("FAIL"):
-                    print(f"    {note}")
-        else:
-            print()
-
-        if not r.ok:
-            failed += 1
-
-    print(sep)
-    passed = len(all_results) - failed
-    suffix = "  —  all good" if not failed else f"  —  {failed} FAILED"
-    print(f"  {passed}/{len(all_results)} passed{suffix}")
-    print(sep)
-    return failed
 
 
 if __name__ == "__main__":

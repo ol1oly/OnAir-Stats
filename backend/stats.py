@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 import httpx
 from rapidfuzz import fuzz, process
 
@@ -34,7 +34,7 @@ class _PlayerStats(TypedDict):
 
 
 class PlayerPayload(TypedDict):
-    type: str           # "player"
+    type: Literal["player"]
     id: int
     name: str
     team: str
@@ -57,7 +57,7 @@ class _GoalieStats(TypedDict):
 
 
 class GoaliePayload(TypedDict):
-    type: str           # "goalie"
+    type: Literal["goalie"]
     id: int
     name: str
     team: str
@@ -80,7 +80,7 @@ class _TeamStats(TypedDict):
 
 
 class TeamPayload(TypedDict):
-    type: str           # "team"
+    type: Literal["team"]
     name: str
     abbrev: str
     logo_url: str
@@ -89,48 +89,6 @@ class TeamPayload(TypedDict):
     division_rank: int
     display: str
     ts: int
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-def _load_players() -> dict[str, int]:
-    with open(DATA_DIR / "players.json", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _load_teams() -> dict[str, str]:
-    with open(DATA_DIR / "teams.json", encoding="utf-8") as f:
-        return json.load(f)
-
-
-# ---------------------------------------------------------------------------
-# STATS-03: lookup_player_id
-# ---------------------------------------------------------------------------
-
-def lookup_player_id(name: str) -> int | None:
-    """Case-insensitive player name → NHL player ID. Returns None if not found."""
-    players = _load_players()
-    name_lower = name.lower()
-    for k, v in players.items():
-        if k.lower() == name_lower:
-            return v
-    return None
-
-
-# ---------------------------------------------------------------------------
-# STATS-04: lookup_team_abbrev
-# ---------------------------------------------------------------------------
-
-def lookup_team_abbrev(name: str) -> str | None:
-    """Case-insensitive team name / alias / city → abbreviation. Returns None if not found."""
-    teams = _load_teams()
-    name_lower = name.lower()
-    for k, v in teams.items():
-        if k.lower() == name_lower:
-            return v
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +125,6 @@ async def search_player_id(name: str, active: bool | None = True) -> int | None:
     if not results:
         return None
 
-    
-
-    if not results:
-        return None
-
     # Exact case-insensitive match first
     name_lower = name.lower()
     for r in results:
@@ -196,14 +149,30 @@ class StatsClient:
     """
     Wraps NHL API calls with a 45-second in-memory cache.
     Lookup methods load data once at construction time for efficiency.
+
+    Call ``await client.start()`` before making API requests (creates the
+    shared HTTP connection pool) and ``await client.close()`` on shutdown.
     """
 
     def __init__(self) -> None:
-        raw_players = _load_players()
-        raw_teams = _load_teams()
+        with open(DATA_DIR / "players.json", encoding="utf-8") as f:
+            raw_players: dict[str, int] = json.load(f)
+        with open(DATA_DIR / "teams.json", encoding="utf-8") as f:
+            raw_teams: dict[str, str] = json.load(f)
         self._players_lower: dict[str, int] = {k.lower(): v for k, v in raw_players.items()}
         self._teams_lower: dict[str, str] = {k.lower(): v for k, v in raw_teams.items()}
         self._cache: dict[str, tuple[float, dict]] = {}
+        self._http: httpx.AsyncClient | None = None
+
+    async def start(self) -> None:
+        """Create the shared HTTP client (connection pool)."""
+        self._http = httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True)
+
+    async def close(self) -> None:
+        """Close the shared HTTP client."""
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
 
     def lookup_player_id(self, name: str) -> int | None:
         """Case-insensitive player name → NHL player ID."""
@@ -237,10 +206,10 @@ class StatsClient:
             return cached
 
         try:
-            async with httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True) as client:
-                resp = await client.get(f"{NHL_API_BASE}/player/{player_id}/landing")
-                resp.raise_for_status()
-                data = resp.json()
+            http = self._http or httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True)
+            resp = await http.get(f"{NHL_API_BASE}/player/{player_id}/landing")
+            resp.raise_for_status()
+            data = resp.json()
         except Exception:
             return None
 
@@ -292,10 +261,10 @@ class StatsClient:
         standings = self._cache_get("standings")
         if standings is None:
             try:
-                async with httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True) as client:
-                    resp = await client.get(f"{NHL_API_BASE}/standings/now")
-                    resp.raise_for_status()
-                    standings = resp.json()
+                http = self._http or httpx.AsyncClient(timeout=NHL_HTTP_TIMEOUT, follow_redirects=True)
+                resp = await http.get(f"{NHL_API_BASE}/standings/now")
+                resp.raise_for_status()
+                standings = resp.json()
             except Exception:
                 return None
             self._cache_set("standings", standings)

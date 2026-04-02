@@ -42,15 +42,17 @@ _stats_client = StatsClient()
 
 async def broadcast(payload: dict) -> None:
     """Wrap payload in the v1 envelope and send to all /ws clients. Removes dead connections silently."""
-    global _ws_clients
     message = json.dumps({"v": 1, "payload": payload})
     dead: set[WebSocket] = set()
-    for ws in _ws_clients:
+
+    async def _safe_send(ws: WebSocket) -> None:
         try:
             await ws.send_text(message)
         except Exception:
             dead.add(ws)
-    _ws_clients -= dead
+
+    await asyncio.gather(*(_safe_send(ws) for ws in _ws_clients))
+    _ws_clients.difference_update(dead)
 
 
 def _system_payload(event: str, message: str) -> dict:
@@ -78,16 +80,21 @@ async def _fetch_and_broadcast_team(abbrev: str) -> None:
 
 
 async def _handle_transcript(text: str) -> None:
-    result = await _extractor.extract_entities(text)
-    coros = []
-    for name in result["players"]:
-        player_id = _stats_client.lookup_player_id(name)
-        if player_id is not None:
-            coros.append(_fetch_and_broadcast_player(player_id, name))
-    for abbrev in result["teams"]:
-        coros.append(_fetch_and_broadcast_team(abbrev))
-    if coros:
-        await asyncio.gather(*coros)
+    try:
+        result = _extractor.extract_entities(text)
+        coros = []
+        for name in result["players"]:
+            player_id = _stats_client.lookup_player_id(name)
+            if player_id is not None:
+                coros.append(_fetch_and_broadcast_player(player_id, name))
+        for abbrev in result["teams"]:
+            coros.append(_fetch_and_broadcast_team(abbrev))
+        if coros:
+            await asyncio.gather(*coros)
+    except Exception:
+        print(f"[server] error handling transcript: {text!r}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc()
 
 
 def _on_transcript(text: str, is_final: bool) -> None:
@@ -115,6 +122,7 @@ def _on_transcriber_error(message: str) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _transcriber
+    await _stats_client.start()
     api_key = os.environ.get("DEEPGRAM_API_KEY", "")
     if api_key:
         _transcriber = DeepgramTranscriber(
@@ -131,6 +139,7 @@ async def lifespan(app: FastAPI):
     if _transcriber is not None:
         await _transcriber.stop()
         print("[server] Deepgram transcriber stopped", flush=True)
+    await _stats_client.close()
 
 
 # ---------------------------------------------------------------------------

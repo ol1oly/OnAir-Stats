@@ -11,50 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import sys
-import time
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from stats import StatsClient, build_goalie_payload, build_player_payload, build_team_payload
+from live_helpers import Result, check as _check, timed as _timed, print_results as _print_results
 
 client = StatsClient()
-
-
-# ---------------------------------------------------------------------------
-# Result container
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Result:
-    name:    str
-    ok:      bool
-    elapsed: float          # seconds
-    error:   str = ""
-    notes:   list[str] = field(default_factory=list)
-
-
-results: list[Result] = []
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _check(result: Result, condition: bool, msg: str) -> None:
-    if not condition:
-        result.ok = False
-        result.notes.append(f"FAIL  {msg}")
-    else:
-        result.notes.append(f"pass  {msg}")
-
-
-async def _timed(coro) -> tuple[Any, float]:
-    t0 = time.perf_counter()
-    value = await coro
-    return value, time.perf_counter() - t0
 
 
 # ---------------------------------------------------------------------------
@@ -270,44 +234,6 @@ async def _run_all() -> list[Result]:
     all_results.append(await test_team_unknown())
 
     return all_results
-
-
-def _print_results(all_results: list[Result]) -> int:
-    col_w = max(len(r.name) for r in all_results) + 2
-    sep = "-" * (col_w + 52)
-
-    print(f"\n{sep}")
-    print(f"  {'Test':<{col_w}}  {'Status':<8}  {'Time':>8}  Notes")
-    print(sep)
-
-    failed = 0
-    for r in all_results:
-        status = "PASS" if r.ok else "FAIL"
-        time_str = f"{r.elapsed * 1000:>7.1f}ms"
-        print(f"  {r.name:<{col_w}}  {status:<8}  {time_str}", end="")
-
-        if r.error:
-            print(f"  => {r.error}")
-        elif not r.ok:
-            print()
-            for note in r.notes:
-                if note.startswith("FAIL"):
-                    print(f"    {note}")
-        else:
-            print()
-
-        if not r.ok:
-            failed += 1
-
-    print(sep)
-    passed = len(all_results) - failed
-    print(f"  {passed}/{len(all_results)} passed", end="")
-    if failed:
-        print(f"  —  {failed} FAILED")
-    else:
-        print("  —  all good")
-    print(sep)
-    return failed
 
 
 if __name__ == "__main__":

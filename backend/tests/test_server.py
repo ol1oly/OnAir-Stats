@@ -384,7 +384,7 @@ class TestTranscriptPipeline:
     def test_player_transcript_broadcasts_player_payload(self):
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": ["Connor McDavid"], "teams": []})),
+                         return_value={"players": ["Connor McDavid"], "teams": []}),
             patch.object(server._stats_client, "lookup_player_id", return_value=8478402),
             patch.object(server._stats_client, "get_player",
                          new=AsyncMock(return_value=_SKATER_EXTRACTED)),
@@ -401,7 +401,7 @@ class TestTranscriptPipeline:
     def test_goalie_transcript_broadcasts_goalie_payload(self):
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": ["Jacob Markstrom"], "teams": []})),
+                         return_value={"players": ["Jacob Markstrom"], "teams": []}),
             patch.object(server._stats_client, "lookup_player_id", return_value=8474593),
             patch.object(server._stats_client, "get_player",
                          new=AsyncMock(return_value=_GOALIE_EXTRACTED)),
@@ -417,7 +417,7 @@ class TestTranscriptPipeline:
     def test_team_transcript_broadcasts_team_payload(self):
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": [], "teams": ["EDM"]})),
+                         return_value={"players": [], "teams": ["EDM"]}),
             patch.object(server._stats_client, "get_team",
                          new=AsyncMock(return_value=_TEAM_EXTRACTED)),
             patch("server.broadcast", new=AsyncMock()) as mock_bc,
@@ -432,7 +432,7 @@ class TestTranscriptPipeline:
     def test_player_and_team_both_broadcast(self):
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": ["Connor McDavid"], "teams": ["EDM"]})),
+                         return_value={"players": ["Connor McDavid"], "teams": ["EDM"]}),
             patch.object(server._stats_client, "lookup_player_id", return_value=8478402),
             patch.object(server._stats_client, "get_player",
                          new=AsyncMock(return_value=_SKATER_EXTRACTED)),
@@ -450,7 +450,7 @@ class TestTranscriptPipeline:
         """Player not in players.json — lookup returns None → no broadcast."""
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": ["Unknown Player"], "teams": []})),
+                         return_value={"players": ["Unknown Player"], "teams": []}),
             patch.object(server._stats_client, "lookup_player_id", return_value=None),
             patch("server.broadcast", new=AsyncMock()) as mock_bc,
         ):
@@ -462,7 +462,7 @@ class TestTranscriptPipeline:
         """get_player returns None (API error) → no broadcast."""
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": ["Connor McDavid"], "teams": []})),
+                         return_value={"players": ["Connor McDavid"], "teams": []}),
             patch.object(server._stats_client, "lookup_player_id", return_value=8478402),
             patch.object(server._stats_client, "get_player",
                          new=AsyncMock(return_value=None)),
@@ -475,7 +475,7 @@ class TestTranscriptPipeline:
     def test_empty_transcript_skips_broadcast(self):
         with (
             patch.object(server._extractor, "extract_entities",
-                         new=AsyncMock(return_value={"players": [], "teams": []})),
+                         return_value={"players": [], "teams": []}),
             patch("server.broadcast", new=AsyncMock()) as mock_bc,
         ):
             self._run(server._handle_transcript(""))

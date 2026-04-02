@@ -58,3 +58,25 @@ DEEPGRAM_LANGUAGE = "en"
 
 # Max seconds between reconnection attempts when the Deepgram WebSocket drops
 DEEPGRAM_RECONNECT_MAX_DELAY = 30.0
+
+# ---------------------------------------------------------------------------
+# Transcriber CLI — standalone mic/file verification mode
+# ---------------------------------------------------------------------------
+
+# Sample rate (Hz) for mic input when running `python transcriber.py --mic`
+TRANSCRIBER_MIC_SAMPLE_RATE = 16000
+
+# Number of audio channels for mic input (1 = mono)
+TRANSCRIBER_MIC_CHANNELS = 1
+
+# Bytes per audio chunk from the mic (~256ms of audio at 16 kHz mono int16)
+TRANSCRIBER_MIC_BLOCK = 4096
+
+# Bytes per chunk when streaming an audio file to Deepgram
+TRANSCRIBER_FILE_CHUNK = 4096
+
+# Seconds to pause between sending file chunks (paces the stream realistically)
+TRANSCRIBER_FILE_PACE = 0.05
+
+# Seconds to wait after the last chunk before stopping (lets Deepgram flush final results)
+TRANSCRIBER_DRAIN_WAIT = 15

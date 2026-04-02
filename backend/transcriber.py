@@ -158,9 +158,11 @@ if __name__ == "__main__":
         if mic_mode:
             import sounddevice as sd
 
-            MIC_SAMPLE_RATE = 16000
-            MIC_CHANNELS = 1
-            MIC_BLOCK = 4096  # ~256ms of audio per chunk
+            from config import (
+                TRANSCRIBER_MIC_SAMPLE_RATE as MIC_SAMPLE_RATE,
+                TRANSCRIBER_MIC_CHANNELS as MIC_CHANNELS,
+                TRANSCRIBER_MIC_BLOCK as MIC_BLOCK,
+            )
 
             transcriber = DeepgramTranscriber(
                 api_key=api_key,
@@ -193,16 +195,18 @@ if __name__ == "__main__":
 
             await transcriber.stop()
         else:
+            from config import TRANSCRIBER_FILE_CHUNK, TRANSCRIBER_FILE_PACE, TRANSCRIBER_DRAIN_WAIT
+
             transcriber = DeepgramTranscriber(api_key=api_key, on_transcript=_print_transcript)
             await transcriber.start()
             print(f"[transcriber] connected — streaming {audio_path}", flush=True)
 
             with open(audio_path, "rb") as f:
-                while chunk := f.read(4096):
+                while chunk := f.read(TRANSCRIBER_FILE_CHUNK):
                     await transcriber.send_audio(chunk)
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(TRANSCRIBER_FILE_PACE)
 
-            await asyncio.sleep(15)
+            await asyncio.sleep(TRANSCRIBER_DRAIN_WAIT)
             await transcriber.stop()
 
         print("[transcriber] done", flush=True)

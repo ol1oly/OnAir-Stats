@@ -54,6 +54,7 @@ export function useMicCapture(audioWsUrl: string): {
 
     ws.onerror = () => {
       setIsConnected(false)
+      setIsRecording(false)
     }
   }, [audioWsUrl])
 

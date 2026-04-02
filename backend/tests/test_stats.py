@@ -8,7 +8,7 @@ Run from repo root:
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -122,14 +122,11 @@ def _mock_response(json_data: dict, status_code: int = 200) -> MagicMock:
     return resp
 
 
-def _mock_client(response: MagicMock) -> MagicMock:
-    """Return an async context manager mock whose .get() returns response."""
-    client = AsyncMock()
-    client.get = AsyncMock(return_value=response)
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=client)
-    cm.__aexit__ = AsyncMock(return_value=False)
-    return cm
+def _mock_http(response: MagicMock) -> AsyncMock:
+    """Return a mock httpx.AsyncClient whose .get() returns response."""
+    http = AsyncMock()
+    http.get = AsyncMock(return_value=response)
+    return http
 
 
 # ---------------------------------------------------------------------------
@@ -139,9 +136,8 @@ def _mock_client(response: MagicMock) -> MagicMock:
 @pytest.mark.anyio
 async def test_get_player_skater_fields():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_SKATER_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_player(8478402, "Connor McDavid")
+    client._http = _mock_http(_mock_response(_SKATER_API))
+    result = await client.get_player(8478402, "Connor McDavid")
 
     assert result is not None
     assert result["_type"] == "skater"
@@ -167,9 +163,8 @@ async def test_get_player_skater_fields():
 @pytest.mark.anyio
 async def test_get_player_goalie_fields():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_GOALIE_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_player(8474593, "Jacob Markstrom")
+    client._http = _mock_http(_mock_response(_GOALIE_API))
+    result = await client.get_player(8474593, "Jacob Markstrom")
 
     assert result is not None
     assert result["_type"] == "goalie"
@@ -193,9 +188,8 @@ async def test_get_player_goalie_fields():
 @pytest.mark.anyio
 async def test_get_player_http_error_returns_none():
     client = StatsClient()
-    cm = _mock_client(_mock_response({}, status_code=404))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_player(9999999, "Unknown")
+    client._http = _mock_http(_mock_response({}, status_code=404))
+    result = await client.get_player(9999999, "Unknown")
     assert result is None
 
 
@@ -206,12 +200,12 @@ async def test_get_player_http_error_returns_none():
 @pytest.mark.anyio
 async def test_get_player_cache_hit():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_SKATER_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm) as mock_cls:
-        await client.get_player(8478402, "Connor McDavid")
-        await client.get_player(8478402, "Connor McDavid")
-    # AsyncClient should only have been instantiated once
-    assert mock_cls.call_count == 1
+    mock_http = _mock_http(_mock_response(_SKATER_API))
+    client._http = mock_http
+    await client.get_player(8478402, "Connor McDavid")
+    await client.get_player(8478402, "Connor McDavid")
+    # HTTP .get() should only have been called once (second is a cache hit)
+    assert mock_http.get.call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -221,9 +215,8 @@ async def test_get_player_cache_hit():
 @pytest.mark.anyio
 async def test_get_team_fields():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_STANDINGS_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_team("EDM")
+    client._http = _mock_http(_mock_response(_STANDINGS_API))
+    result = await client.get_team("EDM")
 
     assert result is not None
     assert result["name"] == "Edmonton Oilers"
@@ -249,9 +242,8 @@ async def test_get_team_fields():
 @pytest.mark.anyio
 async def test_get_team_case_insensitive():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_STANDINGS_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_team("edm")
+    client._http = _mock_http(_mock_response(_STANDINGS_API))
+    result = await client.get_team("edm")
     assert result is not None
     assert result["abbrev"] == "EDM"
 
@@ -263,9 +255,8 @@ async def test_get_team_case_insensitive():
 @pytest.mark.anyio
 async def test_get_team_not_found_returns_none():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_STANDINGS_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_team("XYZ")
+    client._http = _mock_http(_mock_response(_STANDINGS_API))
+    result = await client.get_team("XYZ")
     assert result is None
 
 
@@ -276,9 +267,8 @@ async def test_get_team_not_found_returns_none():
 @pytest.mark.anyio
 async def test_get_team_http_error_returns_none():
     client = StatsClient()
-    cm = _mock_client(_mock_response({}, status_code=500))
-    with patch("stats.httpx.AsyncClient", return_value=cm):
-        result = await client.get_team("EDM")
+    client._http = _mock_http(_mock_response({}, status_code=500))
+    result = await client.get_team("EDM")
     assert result is None
 
 
@@ -289,11 +279,11 @@ async def test_get_team_http_error_returns_none():
 @pytest.mark.anyio
 async def test_get_team_cache_hit():
     client = StatsClient()
-    cm = _mock_client(_mock_response(_STANDINGS_API))
-    with patch("stats.httpx.AsyncClient", return_value=cm) as mock_cls:
-        await client.get_team("EDM")
-        await client.get_team("TOR")  # different team, same standings fetch
-    assert mock_cls.call_count == 1
+    mock_http = _mock_http(_mock_response(_STANDINGS_API))
+    client._http = mock_http
+    await client.get_team("EDM")
+    await client.get_team("TOR")  # different team, same standings fetch
+    assert mock_http.get.call_count == 1
 
 
 # ---------------------------------------------------------------------------

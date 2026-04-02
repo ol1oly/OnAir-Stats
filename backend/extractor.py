@@ -1,7 +1,6 @@
 """Transcript entity extraction — fuzzy (n-gram) mode."""
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 import sys
@@ -19,8 +18,8 @@ class Extractor:
     Extracts NHL entities from a transcript using fuzzy matching.
 
     Returns canonical names and team abbreviations — no network calls, no stats.
-    The server pipeline (server.py) calls stats.lookup_player_id() and
-    stats.lookup_team_abbrev() on the returned values to resolve IDs/abbreviations
+    The server pipeline (server.py) calls StatsClient.lookup_player_id() and
+    StatsClient.lookup_team_abbrev() on the returned values to resolve IDs/abbreviations
     before fetching live stats.
 
     Usage:
@@ -43,7 +42,7 @@ class Extractor:
         self._team_names_lower: list[str] = [n.lower() for n in raw_teams.keys()]
         self._team_abbrevs: list[str] = list(raw_teams.values())
 
-    async def extract_entities(self, transcript: str) -> dict[str, list]:
+    def extract_entities(self, transcript: str) -> dict[str, list]:
         """
         Return {"players": [canonical_name, ...], "teams": [abbrev, ...]}
         without any network calls.
@@ -130,12 +129,9 @@ if __name__ == "__main__":
     sentences = sys.argv[1:] if len(sys.argv) > 1 else _SAMPLES
     extractor = Extractor()
 
-    async def _run() -> None:
-        for sentence in sentences:
-            result = await extractor.extract_entities(sentence)
-            print(f"INPUT   : {sentence}")
-            print(f"players : {result['players']}")
-            print(f"teams   : {result['teams']}")
-            print()
-
-    asyncio.run(_run())
+    for sentence in sentences:
+        result = extractor.extract_entities(sentence)
+        print(f"INPUT   : {sentence}")
+        print(f"players : {result['players']}")
+        print(f"teams   : {result['teams']}")
+        print()

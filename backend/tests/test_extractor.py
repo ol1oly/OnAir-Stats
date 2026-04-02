@@ -16,7 +16,6 @@ Sections:
 """
 from __future__ import annotations
 
-import asyncio
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -441,14 +440,14 @@ SECTIONS: list[tuple[str, list[TC]]] = [
 # Test runner
 # ---------------------------------------------------------------------------
 
-async def _run_all(extractor: Extractor) -> tuple[int, int]:
+def _run_all(extractor: Extractor) -> tuple[int, int]:
     passed = failed = 0
 
     for heading, cases in SECTIONS:
         print(f"\n{heading}")
         print("─" * 46)
         for tc in cases:
-            result  = await extractor.extract_entities(tc.transcript)
+            result  = extractor.extract_entities(tc.transcript)
             p_set   = set(result["players"])
             t_set   = set(result["teams"])
             errors: list[str] = []
@@ -487,7 +486,7 @@ if __name__ == "__main__":
     total_cases = sum(len(cases) for _, cases in SECTIONS)
     print(f"Running {total_cases} tests across {len(SECTIONS)} sections…")
 
-    _passed, _failed = asyncio.run(_run_all(_extractor))
+    _passed, _failed = _run_all(_extractor)
     total = _passed + _failed
 
     print(f"\n{'=' * 46}")
