@@ -27,18 +27,17 @@ The core pipeline is fully wired end-to-end: audio → Deepgram → extractor �
 
 **Backend:**
 
-The backend uses a virtual environment at `backend/.venv`. Always use it explicitly — never the system Python.
+The backend uses a virtual environment at `backend/.venv`. Always use it explicitly — never the system Python. All paths below are relative to the repo root.
 
 ```bash
-cd backend
-backend/.venv/Scripts/python.exe -m pip install -r requirements.txt
-backend/.venv/Scripts/python.exe -m uvicorn server:app --reload --port 8000
+backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+backend/.venv/Scripts/python.exe -m uvicorn server:app --reload --port 8000 --app-dir backend
 ```
 
 Run tests:
 ```bash
-backend/.venv/Scripts/python.exe -m pytest tests/
-backend/.venv/Scripts/python.exe -m pytest tests/test_server.py -v   # single file
+backend/.venv/Scripts/python.exe -m pytest backend/tests/
+backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py -v   # single file
 ```
 
 ### Python Dependencies
@@ -140,6 +139,7 @@ When adding a new feature or module, if it introduces any value that could reaso
 | `components/GoalieCard.tsx` | Goalie stat card; teal accent |
 | `components/TeamCard.tsx` | Team stat card; gold/amber accent |
 | `components/MicHud.tsx` | Recording control HUD (top-right); WS connection indicator + start/stop button |
+| `utils/initials.ts` | Derives 2-letter initials from a full name (used in card avatars) |
 | `TriggerCard.tsx` | *(planned)* Custom trigger card; purple/violet accent |
 | `TriggerBuilder.tsx` | *(planned)* UI to create custom triggers with LLM-resolved endpoint preview |
 | `TriggerList.tsx` | *(planned)* List/toggle/delete saved custom triggers |
