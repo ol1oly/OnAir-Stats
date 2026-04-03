@@ -22,3 +22,9 @@ Planning, tasks, and feature specs.
 - `trigger-builder.md` — full spec for the custom trigger system (MVP + post-MVP)
 - `future-payloads.md` — idea backlog for new card types and trigger display variants
 - `frontend-design.md` — frontend architecture and component breakdown
+
+## superpowers/specs
+- `2026-04-02-sessions-design.md` — multi-user shared overlay sessions: short-code rooms, session-scoped broadcast, lock/unlock, creator transfer
+
+## superpowers/plans
+- `2026-04-02-sessions.md` — step-by-step implementation plan for the sessions feature

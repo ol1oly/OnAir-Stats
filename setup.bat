@@ -140,7 +140,7 @@ if "!DGKEY!"=="" (
 :done
 echo.
 if !ERRORS!==0 (
-    echo [setup] All done. Run dev.bat to start both servers.
+    echo [setup] All done. Run "dev.bat" for full dev (backend + Vite HMR on :5173) or "dev.bat build" for backend-only (builds frontend, serves on :8000).
 ) else (
     echo [setup] Setup finished with warnings. Fix the issues above, then run dev.bat.
 )

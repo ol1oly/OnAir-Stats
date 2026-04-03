@@ -26,7 +26,10 @@
       "Bash(find /c/Bureau/live_stats -name *.md -type f)",
       "Bash(find /c/Bureau/live_stats -maxdepth 2 -name *.py -type f)",
       "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py backend/tests/test_stats.py -v)",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/test_stats.py tests/test_server.py -v)"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_stats.py tests/test_server.py -v)",
+      "Bash(C:/Users/Olivier/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
+      "Bash(cat \"C:/Bureau/live_stats/.superpowers/brainstorm/\"*/state/server-info)",
+      "Bash(xargs cat:*)"
     ]
   },
   "spinnerTipsEnabled": true,
