@@ -22,13 +22,15 @@ export const WS_AUDIO_URL = 'ws://localhost:8000/audio'
 // Overlay behaviour
 // ---------------------------------------------------------------------------
 
-// Maximum number of stat cards visible on screen at once (oldest is dropped when exceeded)
+// Maximum number of stat cards visible on screen at once (oldest is dropped when exceeded).
+// Runtime value comes from SettingsContext (localStorage). This is the default.
 export const MAX_CARDS = 3
 
 // If the same player/team is mentioned again within this window (ms), ignore the duplicate
 export const DEDUP_MS = 2000
 
-// How long (ms) a stat card stays on screen before sliding out
+// How long (ms) a stat card stays on screen before sliding out.
+// Runtime value comes from SettingsContext (localStorage). This is the default.
 export const CARD_DISPLAY_MS = 8000
 
 // Duration (ms) of the slide-out/fade animation when a card is dismissed
