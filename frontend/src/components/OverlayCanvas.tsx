@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { WS_OVERLAY_URL, MAX_CARDS, DEDUP_MS, CARD_DISPLAY_MS, CARD_EXIT_MS } from '../config'
+import { WS_OVERLAY_URL, DEDUP_MS, CARD_EXIT_MS } from '../config'
+import { useSettings } from '../contexts/SettingsContext'
 import { useOverlaySocket } from '../hooks/useOverlaySocket'
 import type { StatPayload } from '../types/payloads'
 import { StatCard } from './StatCard'
@@ -27,13 +28,13 @@ function cardId(p: StatPayload): string {
 // DebugCountdown — isolated so only this re-renders every second
 // ---------------------------------------------------------------------------
 
-function DebugCountdown({ resetKey }: { resetKey: number }) {
-  const [secondsLeft, setSecondsLeft] = useState(CARD_DISPLAY_MS / 1000)
+function DebugCountdown({ resetKey, cardDisplayMs }: { resetKey: number; cardDisplayMs: number }) {
+  const [secondsLeft, setSecondsLeft] = useState(cardDisplayMs / 1000)
   useEffect(() => {
-    setSecondsLeft(CARD_DISPLAY_MS / 1000)
+    setSecondsLeft(cardDisplayMs / 1000)
     const interval = setInterval(() => setSecondsLeft(s => s - 1), 1000)
     return () => clearInterval(interval)
-  }, [resetKey])
+  }, [resetKey, cardDisplayMs])
   return (
     <span className="absolute top-1 right-2 text-gray-500 text-[11px] tabular-nums pointer-events-none">
       {secondsLeft}s
@@ -42,7 +43,7 @@ function DebugCountdown({ resetKey }: { resetKey: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// CardWrapper — owns the 8s timer; renders card + optional debug badge
+// CardWrapper — owns the display timer; renders card + optional debug badge
 // ---------------------------------------------------------------------------
 
 type CardWrapperProps = {
@@ -50,9 +51,10 @@ type CardWrapperProps = {
   removeCard: (id: string) => void
   resetCard: (id: string) => void
   debug: boolean
+  cardDisplayMs: number
 }
 
-function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
+function CardWrapper({ item, removeCard, resetCard, debug, cardDisplayMs }: CardWrapperProps) {
   const [isExiting, setIsExiting] = useState(false)
   const onExpire = useCallback(() => removeCard(item.id), [removeCard, item.id])
 
@@ -61,9 +63,9 @@ function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
     const outer = setTimeout(() => {
       setIsExiting(true)
       setTimeout(onExpire, CARD_EXIT_MS)
-    }, CARD_DISPLAY_MS)
+    }, cardDisplayMs)
     return () => clearTimeout(outer)
-  }, [item.resetKey, onExpire])
+  }, [item.resetKey, onExpire, cardDisplayMs])
 
   const handleClick = useCallback(() => resetCard(item.id), [resetCard, item.id])
   const { id, payload } = item
@@ -73,7 +75,7 @@ function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
       {payload.type === 'player' && <StatCard key={id} payload={payload} isExiting={isExiting} />}
       {payload.type === 'goalie' && <GoalieCard key={id} payload={payload} isExiting={isExiting} />}
       {payload.type === 'team' && <TeamCard key={id} payload={payload} isExiting={isExiting} />}
-      {debug && <DebugCountdown resetKey={item.resetKey} />}
+      {debug && <DebugCountdown resetKey={item.resetKey} cardDisplayMs={cardDisplayMs} />}
     </div>
   )
 }
@@ -83,6 +85,7 @@ function CardWrapper({ item, removeCard, resetCard, debug }: CardWrapperProps) {
 // ---------------------------------------------------------------------------
 
 export function OverlayCanvas() {
+  const { settings } = useSettings()
   const { latestPayload } = useOverlaySocket(WS_OVERLAY_URL)
   const [cards, setCards] = useState<CardItem[]>([])
   const seenRef = useRef<Map<string, number>>(new Map())
@@ -112,15 +115,22 @@ export function OverlayCanvas() {
       }
       if (now - lastSeen < DEDUP_MS) return prev
       const next = [...prev, { id: cardId(latestPayload), payload: latestPayload, resetKey: 0 }]
-      return next.length > MAX_CARDS ? next.slice(next.length - MAX_CARDS) : next
+      return next.length > settings.maxCards ? next.slice(next.length - settings.maxCards) : next
     })
     seenRef.current.set(key, now)
-  }, [latestPayload])
+  }, [latestPayload, settings.maxCards])
 
   return (
     <div className="absolute bottom-8 left-8 flex flex-col-reverse gap-3">
       {cards.map(item => (
-        <CardWrapper key={item.id} item={item} removeCard={removeCard} resetCard={resetCard} debug={DEBUG} />
+        <CardWrapper
+          key={item.id}
+          item={item}
+          removeCard={removeCard}
+          resetCard={resetCard}
+          debug={DEBUG}
+          cardDisplayMs={settings.cardDisplayMs}
+        />
       ))}
     </div>
   )

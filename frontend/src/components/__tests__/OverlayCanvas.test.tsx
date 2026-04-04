@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, fireEvent } from '@testing-library/react'
+import React from 'react'
 import { CARD_DISPLAY_MS, CARD_EXIT_MS, DEDUP_MS } from '../../config'
 import { OverlayCanvas } from '../OverlayCanvas'
+import { SettingsProvider } from '../../contexts/SettingsContext'
 import type { PlayerPayload, GoaliePayload, TeamPayload } from '../../types/payloads'
+
+vi.stubGlobal('fetch', vi.fn(() =>
+  Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) } as Response)
+))
 
 // ── mock useOverlaySocket ────────────────────────────────────────────────────
 let mockLatestPayload: PlayerPayload | GoaliePayload | TeamPayload | null = null
@@ -28,6 +34,12 @@ const team: TeamPayload = {
   conference_rank: 2, division_rank: 1, display: '', ts: 3000,
 }
 
+function renderCanvas() {
+  return render(
+    React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))
+  )
+}
+
 beforeEach(() => {
   mockLatestPayload = null
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
@@ -38,28 +50,28 @@ afterEach(() => {
 
 describe('OverlayCanvas — routing', () => {
   it('renders StatCard for player payload', () => {
-    const { rerender } = render(<OverlayCanvas />)
+    const { rerender } = renderCanvas()
     act(() => {
       mockLatestPayload = player
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
   })
 
   it('renders GoalieCard for goalie payload', () => {
-    const { rerender } = render(<OverlayCanvas />)
+    const { rerender } = renderCanvas()
     act(() => {
       mockLatestPayload = goalie
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getByText('Jacob Markstrom')).toBeTruthy()
   })
 
   it('renders TeamCard for team payload', () => {
-    const { rerender } = render(<OverlayCanvas />)
+    const { rerender } = renderCanvas()
     act(() => {
       mockLatestPayload = team
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getByText('Edmonton Oilers')).toBeTruthy()
   })
@@ -67,42 +79,36 @@ describe('OverlayCanvas — routing', () => {
 
 describe('OverlayCanvas — deduplication', () => {
   it('resets existing card instead of adding a duplicate when entity is still visible', () => {
-    const { rerender } = render(<OverlayCanvas />)
-    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    const { rerender } = renderCanvas()
+    act(() => { mockLatestPayload = player; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
     act(() => { vi.advanceTimersByTime(1000) })
     act(() => {
       mockLatestPayload = { ...player, ts: player.ts + 1000 }
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getAllByText('Connor McDavid')).toHaveLength(1)
   })
 
   it('adds a new card after prior card expires and dedup window passes', () => {
-    const { rerender } = render(<OverlayCanvas />)
-    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    const { rerender } = renderCanvas()
+    act(() => { mockLatestPayload = player; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
     // card expires at CARD_DISPLAY_MS + CARD_EXIT_MS, dedup window (DEDUP_MS) ends after that
     const reappearDelay = CARD_DISPLAY_MS + CARD_EXIT_MS + DEDUP_MS + 1
     act(() => { vi.advanceTimersByTime(reappearDelay) })
     act(() => {
       mockLatestPayload = { ...player, ts: player.ts + reappearDelay }
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
   })
 
   it('does not add a duplicate card within the 2s dedup window when no active card', () => {
-    const { rerender } = render(<OverlayCanvas />)
-    // Advance past card expiry (8200ms) but stay within 2s of last processing
-    // Trigger: first payload at t=8000ms (card still showing), seenRef updates to 8000ms,
-    // card resets to expire at 16200ms. Then card gets manually removed and a payload
-    // arrives at t=9000ms (within 2s of seenRef=8000ms).
-    // Simpler: just verify a second payload at t=100ms (before seenRef expires) doesn't add.
-    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    const { rerender } = renderCanvas()
+    act(() => { mockLatestPayload = player; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
     act(() => { vi.advanceTimersByTime(100) })
-    // Same entity arrives 100ms later — card still active, gets reset (not a new card)
     act(() => {
       mockLatestPayload = { ...player, ts: player.ts + 100 }
-      rerender(<OverlayCanvas />)
+      rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas)))
     })
     expect(screen.getAllByText('Connor McDavid')).toHaveLength(1)
   })
@@ -110,16 +116,16 @@ describe('OverlayCanvas — deduplication', () => {
 
 describe('OverlayCanvas — max cards', () => {
   it('shows at most 3 cards, dropping the oldest', () => {
-    const { rerender } = render(<OverlayCanvas />)
+    const { rerender } = renderCanvas()
     const p1: PlayerPayload = { ...player, id: 10, name: 'Player One', ts: 1000 }
     const p2: PlayerPayload = { ...player, id: 11, name: 'Player Two', ts: 2000 }
     const p3: PlayerPayload = { ...player, id: 12, name: 'Player Three', ts: 3000 }
     const p4: PlayerPayload = { ...player, id: 13, name: 'Player Four', ts: 4000 }
 
-    act(() => { mockLatestPayload = p1; rerender(<OverlayCanvas />) })
-    act(() => { mockLatestPayload = p2; rerender(<OverlayCanvas />) })
-    act(() => { mockLatestPayload = p3; rerender(<OverlayCanvas />) })
-    act(() => { mockLatestPayload = p4; rerender(<OverlayCanvas />) })
+    act(() => { mockLatestPayload = p1; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
+    act(() => { mockLatestPayload = p2; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
+    act(() => { mockLatestPayload = p3; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
+    act(() => { mockLatestPayload = p4; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
 
     expect(screen.queryByText('Player One')).toBeNull()
     expect(screen.getByText('Player Two')).toBeTruthy()
@@ -130,16 +136,16 @@ describe('OverlayCanvas — max cards', () => {
 
 describe('OverlayCanvas — timer', () => {
   it(`removes card after ${CARD_DISPLAY_MS + CARD_EXIT_MS}ms`, () => {
-    const { rerender } = render(<OverlayCanvas />)
-    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    const { rerender } = renderCanvas()
+    act(() => { mockLatestPayload = player; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
     act(() => { vi.advanceTimersByTime(CARD_DISPLAY_MS + CARD_EXIT_MS + 1) })
     expect(screen.queryByText('Connor McDavid')).toBeNull()
   })
 
   it('click on card resets its 8s timer', () => {
-    const { rerender } = render(<OverlayCanvas />)
-    act(() => { mockLatestPayload = player; rerender(<OverlayCanvas />) })
+    const { rerender } = renderCanvas()
+    act(() => { mockLatestPayload = player; rerender(React.createElement(SettingsProvider, null, React.createElement(OverlayCanvas))) })
     // advance 7s — card is still showing, 1s remaining
     act(() => { vi.advanceTimersByTime(7000) })
     expect(screen.getByText('Connor McDavid')).toBeTruthy()
