@@ -32,6 +32,8 @@ class DeepgramTranscriber:
         on_error: Callable[[str], None] | None = None,
         encoding: str | None = None,
         sample_rate: int | None = None,
+        model: str | None = None,
+        language: str | None = None,
     ) -> None:
         self._api_key = api_key
         self._on_transcript = on_transcript
@@ -39,6 +41,8 @@ class DeepgramTranscriber:
         self._on_error = on_error
         self._encoding = encoding
         self._sample_rate = str(sample_rate) if sample_rate else None
+        self._model = model if model is not None else DEEPGRAM_MODEL
+        self._language = language if language is not None else DEEPGRAM_LANGUAGE
         self._client = AsyncDeepgramClient(api_key=api_key)
         self._connection: AsyncV1SocketClient | None = None
         self._listen_task: asyncio.Task | None = None
@@ -63,8 +67,8 @@ class DeepgramTranscriber:
         while not self._stopped:
             try:
                 async with self._client.listen.v1.connect(
-                    model=DEEPGRAM_MODEL,
-                    language=DEEPGRAM_LANGUAGE,
+                    model=self._model,
+                    language=self._language,
                     punctuate="true",
                     interim_results="true",
                     encoding=self._encoding,
