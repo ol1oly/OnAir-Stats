@@ -136,7 +136,7 @@ describe('SettingsPage — slider interaction', () => {
     fireEvent.change(sliders[1], { target: { value: '1' } })
     await new Promise(r => setTimeout(r, 0))
     expect(fetchMock).toHaveBeenCalledWith('/settings', expect.objectContaining({ method: 'POST' }))
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    const body = JSON.parse((fetchMock.mock.calls as any)[0][1].body as string)
     expect(body.language).toBe('fr')
   })
 })

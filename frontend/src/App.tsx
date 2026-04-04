@@ -1,16 +1,18 @@
-import { memo } from 'react'
-import { WS_AUDIO_URL } from './config'
-import { useMicCapture } from './hooks/useMicCapture'
-import { OverlayCanvas } from './components/OverlayCanvas'
-import { MicHud } from './components/MicHud'
-const MemoCanvas = memo(OverlayCanvas)
+import { useHashLocation } from 'wouter/use-hash-location'
+import { Router, Route } from 'wouter'
+import { SettingsProvider } from './contexts/SettingsContext'
+import { LandingPage } from './pages/LandingPage'
+import { OverlayPage } from './pages/OverlayPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
-  const { start, stop, isRecording, isConnected } = useMicCapture(WS_AUDIO_URL)
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden relative">
-      <MemoCanvas />
-      <MicHud start={start} stop={stop} isRecording={isRecording} isConnected={isConnected} />
-    </div>
+    <SettingsProvider>
+      <Router hook={useHashLocation}>
+        <Route path="/" component={LandingPage} />
+        <Route path="/overlay" component={OverlayPage} />
+        <Route path="/settings" component={SettingsPage} />
+      </Router>
+    </SettingsProvider>
   )
 }

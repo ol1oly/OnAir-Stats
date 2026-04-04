@@ -5,7 +5,7 @@ import React from 'react'
 const localStorageMock = (() => {
   let store: Record<string, string> = {}
   return {
-    getItem: vi.fn((key: string) => store[key] ?? null),
+    getItem: vi.fn((key: string): string | null => store[key] ?? null),
     setItem: vi.fn((key: string, value: string) => { store[key] = value }),
     removeItem: vi.fn((key: string) => { delete store[key] }),
     clear: vi.fn(() => { store = {} }),
@@ -165,7 +165,7 @@ describe('useSettings — backend POST', () => {
       React.createElement(SettingsProvider, null, children)
     renderHook(() => useSettings(), { wrapper })
     await act(async () => { await Promise.resolve() })
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    const body = JSON.parse((fetchMock.mock.calls as any)[0][1].body as string)
     expect(body).not.toHaveProperty('cardDisplayMs')
     expect(body).not.toHaveProperty('maxCards')
     expect(body).toHaveProperty('model')
