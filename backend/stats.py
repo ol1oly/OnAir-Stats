@@ -163,6 +163,7 @@ class StatsClient:
         self._teams_lower: dict[str, str] = {k.lower(): v for k, v in raw_teams.items()}
         self._cache: dict[str, tuple[float, dict]] = {}
         self._http: httpx.AsyncClient | None = None
+        self.cache_ttl: float = NHL_CACHE_TTL
 
     async def start(self) -> None:
         """Create the shared HTTP client (connection pool)."""
@@ -184,7 +185,7 @@ class StatsClient:
 
     def _cache_get(self, key: str) -> dict | None:
         entry = self._cache.get(key)
-        if entry and time.monotonic() - entry[0] < NHL_CACHE_TTL:
+        if entry and time.monotonic() - entry[0] < self.cache_ttl:
             return entry[1]
         return None
 

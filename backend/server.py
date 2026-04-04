@@ -246,6 +246,61 @@ async def debug_inject(req: InjectRequest) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# SERV-09: POST /settings — update runtime settings
+# ---------------------------------------------------------------------------
+
+class SettingsRequest(BaseModel):
+    language: str | None = None
+    model: str | None = None
+    fuzzy_ngram_threshold: int | None = None
+    fuzzy_partial_threshold: int | None = None
+    cache_ttl: float | None = None
+
+
+@app.post("/settings")
+async def update_settings(req: SettingsRequest) -> dict:
+    """Update runtime settings. Restarts the transcriber if model or language changed."""
+    global _transcriber, _settings
+
+    needs_transcriber_restart = False
+
+    if req.model is not None and req.model != _settings["model"]:
+        _settings["model"] = req.model
+        needs_transcriber_restart = True
+
+    if req.language is not None and req.language != _settings["language"]:
+        _settings["language"] = req.language
+        needs_transcriber_restart = True
+
+    if req.fuzzy_ngram_threshold is not None:
+        _settings["fuzzy_ngram_threshold"] = req.fuzzy_ngram_threshold
+        _extractor.fuzzy_ngram_threshold = req.fuzzy_ngram_threshold
+
+    if req.fuzzy_partial_threshold is not None:
+        _settings["fuzzy_partial_threshold"] = req.fuzzy_partial_threshold
+        _extractor.fuzzy_partial_threshold = req.fuzzy_partial_threshold
+
+    if req.cache_ttl is not None:
+        _settings["cache_ttl"] = req.cache_ttl
+        _stats_client.cache_ttl = req.cache_ttl
+
+    if needs_transcriber_restart and _transcriber is not None:
+        api_key = os.environ.get("DEEPGRAM_API_KEY", "")
+        await _transcriber.stop()
+        _transcriber = DeepgramTranscriber(
+            api_key=api_key,
+            on_transcript=_on_transcript,
+            on_ready=_on_transcriber_ready,
+            on_error=_on_transcriber_error,
+            model=_settings["model"],
+            language=_settings["language"],
+        )
+        await _transcriber.start()
+
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # SERV-01: GET / — serve pre-built React frontend
 # Mounted last so WebSocket routes take priority.
 # ---------------------------------------------------------------------------

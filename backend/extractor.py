@@ -42,6 +42,9 @@ class Extractor:
         self._team_names_lower: list[str] = [n.lower() for n in raw_teams.keys()]
         self._team_abbrevs: list[str] = list(raw_teams.values())
 
+        self.fuzzy_ngram_threshold: int = FUZZY_NGRAM_THRESHOLD
+        self.fuzzy_partial_threshold: int = FUZZY_PARTIAL_THRESHOLD
+
     def extract_entities(self, transcript: str) -> dict[str, list]:
         """
         Return {"players": [canonical_name, ...], "teams": [abbrev, ...]}
@@ -62,7 +65,7 @@ class Extractor:
                     gram,
                     self._player_names_lower,
                     scorer=fuzz.ratio,
-                    score_cutoff=FUZZY_NGRAM_THRESHOLD,
+                    score_cutoff=self.fuzzy_ngram_threshold,
                 )
                 if p_hit:
                     found_players.add(self._player_names[p_hit[2]])
@@ -71,7 +74,7 @@ class Extractor:
                     gram,
                     self._team_names_lower,
                     scorer=fuzz.ratio,
-                    score_cutoff=FUZZY_NGRAM_THRESHOLD,
+                    score_cutoff=self.fuzzy_ngram_threshold,
                 )
                 if t_hit:
                     found_teams.add(self._team_abbrevs[t_hit[2]])
@@ -86,7 +89,7 @@ class Extractor:
                 word,
                 self._player_names_lower,
                 scorer=fuzz.partial_ratio,
-                score_cutoff=FUZZY_PARTIAL_THRESHOLD,
+                score_cutoff=self.fuzzy_partial_threshold,
             )
             if p_hit:
                 found_players.add(self._player_names[p_hit[2]])

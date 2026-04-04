@@ -557,3 +557,71 @@ class TestDebugInject:
     def test_invalid_type_returns_422(self, client):
         resp = client.post("/debug/inject", json={"type": "goalie", "id": 8474593})
         assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# SERV-09 — POST /settings
+# ---------------------------------------------------------------------------
+
+class TestPostSettings:
+    def test_returns_200_with_ok(self, client):
+        resp = client.post("/settings", json={"cache_ttl": 120.0})
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True}
+
+    def test_updates_cache_ttl_in_settings_dict(self, client):
+        client.post("/settings", json={"cache_ttl": 120.0})
+        assert server._settings["cache_ttl"] == 120.0
+
+    def test_updates_fuzzy_ngram_threshold_in_settings_dict(self, client):
+        client.post("/settings", json={"fuzzy_ngram_threshold": 72})
+        assert server._settings["fuzzy_ngram_threshold"] == 72
+
+    def test_updates_fuzzy_partial_threshold_in_settings_dict(self, client):
+        client.post("/settings", json={"fuzzy_partial_threshold": 74})
+        assert server._settings["fuzzy_partial_threshold"] == 74
+
+    def test_updates_extractor_ngram_threshold(self, client):
+        client.post("/settings", json={"fuzzy_ngram_threshold": 62})
+        assert server._extractor.fuzzy_ngram_threshold == 62
+
+    def test_updates_extractor_partial_threshold(self, client):
+        client.post("/settings", json={"fuzzy_partial_threshold": 74})
+        assert server._extractor.fuzzy_partial_threshold == 74
+
+    def test_updates_stats_client_cache_ttl(self, client):
+        client.post("/settings", json={"cache_ttl": 300.0})
+        assert server._stats_client.cache_ttl == 300.0
+
+    def test_partial_update_leaves_other_keys_unchanged(self, client):
+        client.post("/settings", json={"cache_ttl": 15.0, "fuzzy_ngram_threshold": 90})
+        client.post("/settings", json={"cache_ttl": 45.0})
+        assert server._settings["fuzzy_ngram_threshold"] == 90
+        assert server._settings["cache_ttl"] == 45.0
+
+    def test_model_change_restarts_transcriber(self, client, mock_transcriber):
+        initial_stop_count = mock_transcriber.stop.call_count
+        with patch("server.DeepgramTranscriber", return_value=mock_transcriber):
+            client.post("/settings", json={"model": "whisper-large"})
+        assert mock_transcriber.stop.call_count > initial_stop_count
+        assert server._settings["model"] == "whisper-large"
+
+    def test_language_change_restarts_transcriber(self, client, mock_transcriber):
+        initial_stop_count = mock_transcriber.stop.call_count
+        with patch("server.DeepgramTranscriber", return_value=mock_transcriber):
+            client.post("/settings", json={"language": "fr"})
+        assert mock_transcriber.stop.call_count > initial_stop_count
+        assert server._settings["language"] == "fr"
+
+    def test_cache_ttl_change_does_not_restart_transcriber(self, client, mock_transcriber):
+        initial_stop_count = mock_transcriber.stop.call_count
+        client.post("/settings", json={"cache_ttl": 300.0})
+        assert mock_transcriber.stop.call_count == initial_stop_count
+
+    def test_empty_body_returns_200(self, client):
+        resp = client.post("/settings", json={})
+        assert resp.status_code == 200
+
+    def test_invalid_field_type_returns_422(self, client):
+        resp = client.post("/settings", json={"cache_ttl": "not-a-number"})
+        assert resp.status_code == 422
