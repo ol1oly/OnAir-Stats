@@ -254,24 +254,27 @@ class TestSystemEvents:
 
     def test_transcriber_constructed_with_on_ready(self, mock_transcriber_cls):
         cls_mock, _ = mock_transcriber_cls
-        with TestClient(server.app):
-            pass
+        with TestClient(server.app) as client:
+            with client.websocket_connect("/audio"):
+                pass  # connecting audio triggers _start_transcriber
         kwargs = cls_mock.call_args.kwargs
         assert "on_ready" in kwargs
         assert callable(kwargs["on_ready"])
 
     def test_transcriber_constructed_with_on_error(self, mock_transcriber_cls):
         cls_mock, _ = mock_transcriber_cls
-        with TestClient(server.app):
-            pass
+        with TestClient(server.app) as client:
+            with client.websocket_connect("/audio"):
+                pass
         kwargs = cls_mock.call_args.kwargs
         assert "on_error" in kwargs
         assert callable(kwargs["on_error"])
 
     def test_on_ready_broadcasts_transcriber_ready(self, mock_transcriber_cls):
         cls_mock, _ = mock_transcriber_cls
-        with TestClient(server.app):
-            on_ready = cls_mock.call_args.kwargs["on_ready"]
+        with TestClient(server.app) as client:
+            with client.websocket_connect("/audio"):
+                on_ready = cls_mock.call_args.kwargs["on_ready"]
 
         recorded: list[dict] = []
 
@@ -293,8 +296,9 @@ class TestSystemEvents:
 
     def test_on_error_broadcasts_transcriber_error_with_message(self, mock_transcriber_cls):
         cls_mock, _ = mock_transcriber_cls
-        with TestClient(server.app):
-            on_error = cls_mock.call_args.kwargs["on_error"]
+        with TestClient(server.app) as client:
+            with client.websocket_connect("/audio"):
+                on_error = cls_mock.call_args.kwargs["on_error"]
 
         recorded: list[dict] = []
 
@@ -600,6 +604,7 @@ class TestPostSettings:
         assert server._settings["cache_ttl"] == 45.0
 
     def test_model_change_restarts_transcriber(self, client, mock_transcriber):
+        server._transcriber = mock_transcriber  # simulate running transcriber
         initial_stop_count = mock_transcriber.stop.call_count
         with patch("server.DeepgramTranscriber", return_value=mock_transcriber):
             client.post("/settings", json={"model": "whisper-large"})
@@ -607,6 +612,7 @@ class TestPostSettings:
         assert server._settings["model"] == "whisper-large"
 
     def test_language_change_restarts_transcriber(self, client, mock_transcriber):
+        server._transcriber = mock_transcriber  # simulate running transcriber
         initial_stop_count = mock_transcriber.stop.call_count
         with patch("server.DeepgramTranscriber", return_value=mock_transcriber):
             client.post("/settings", json={"language": "fr"})

@@ -50,3 +50,7 @@ export const MIC_TIMESLICE_MS = 250
 
 // Delay sequence (ms) between reconnection attempts — cycles through then stays at the last value
 export const WS_BACKOFF_MS = [1000, 2000, 4000, 5000]
+
+// How long (ms) to wait before auto-reconnecting the /audio WebSocket after an unexpected close
+// (e.g. backend restart after a settings change). Long enough for the server to be ready.
+export const AUDIO_WS_RECONNECT_DELAY_MS = 1500

@@ -216,6 +216,39 @@ A background job (`scripts/refresh_players.py`) that runs on a monthly cron (or 
 
 ---
 
+## Programmatic model/language compatibility check
+
+**Date:** 2026-04-04
+
+Not all Deepgram models support all languages. For example, `nova` does not support French — only `nova-2` and later do. Currently the available model options in the Settings UI are hardcoded and language-agnostic, which means a user could select an incompatible combination without knowing.
+
+**Future improvement:** query the Deepgram REST API at startup (or on language change) to fetch the list of available models for the selected language, then filter `MODEL_STOPS` in `SettingsPage.tsx` dynamically. Deepgram exposes model metadata at:
+
+```
+GET https://api.deepgram.com/v1/models
+Authorization: Token <DEEPGRAM_API_KEY>
+```
+
+The response lists each model with its supported languages. This could be fetched once on server startup, cached, and exposed via a new `GET /models?language=fr` endpoint that the frontend calls when the language setting changes to repopulate the model slider with only compatible options.
+
+---
+
 # note from olivier
  - will probably need to refactor the test directory to use a standardized structure for the tests.
  - will probably need to add more variables in the env file to be able to configure easily the time slide and other good parameters. I noticed a lot of hardcoded variable in the code, will need to have opus at max to analyze the repo and suggest places to be able to easily modify critical variables
+ - the transcriber should start when a client connects and disconnect when no clients. 
+ - nova and whisper do not work, set it to only nova-3 and nova2
+ - make miccapture a component in the app, and pass the start and stop to the landing page
+ function AppRoutes() {
+  const { start, stop, isRecording, isConnected } = useMicCapture(WS_AUDIO_URL)
+
+  return (
+    <Router hook={useHashLocation}>
+      <Route path="/">
+        {() => <LandingPage start={start} stop={stop} isRecording={isRecording} isConnected={isConnected} />}
+      </Route>
+      <Route path="/overlay" component={OverlayPage} />
+      <Route path="/settings" component={SettingsPage} />
+    </Router>
+  )
+}

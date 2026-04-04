@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 
 export interface Settings {
-  model: 'nova' | 'nova-2' | 'whisper-large'
+  model: 'nova-2' | 'nova-3'
   language: 'en' | 'fr'
   fuzzyNgramThreshold: number
   fuzzyPartialThreshold: number
@@ -22,12 +22,16 @@ const DEFAULTS: Settings = {
   maxCards: 3,
 }
 
+const VALID_MODELS = new Set<Settings['model']>(['nova-2', 'nova-3'])
+
 function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULTS
     const parsed = JSON.parse(raw) as Partial<Settings>
-    return { ...DEFAULTS, ...parsed }
+    const merged = { ...DEFAULTS, ...parsed }
+    if (!VALID_MODELS.has(merged.model)) merged.model = DEFAULTS.model
+    return merged
   } catch {
     return DEFAULTS
   }

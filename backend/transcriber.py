@@ -63,7 +63,6 @@ class DeepgramTranscriber:
     async def _run(self) -> None:
         """Background task: hold the WS open, reconnect on timeout/error."""
         delay = 1.0
-        is_reconnect = False
         while not self._stopped:
             try:
                 async with self._client.listen.v1.connect(
@@ -74,12 +73,13 @@ class DeepgramTranscriber:
                     encoding=self._encoding,
                     sample_rate=self._sample_rate,
                 ) as conn:
-                    # On reconnect: inject the WebM header before accepting live audio.
-                    # MediaRecorder only emits the init segment once at the start of a stream;
-                    # without it Deepgram cannot parse subsequent cluster data.
-                    if is_reconnect and self._reconnect_header is not None:
+                    # Replay the WebM init segment on every (re)connect if available.
+                    # On a fresh first start _reconnect_header is None so nothing is sent;
+                    # the browser's first blob sets it via set_reconnect_header().
+                    # On a settings-triggered restart it is pre-set before start() is called,
+                    # ensuring Deepgram can parse cluster data immediately.
+                    if self._reconnect_header is not None:
                         await conn.send_media(self._reconnect_header)
-                    is_reconnect = True
                     self._connection = conn  # expose only after header is sent
                     delay = 1.0  # reset backoff on successful connect
                     self._ready.set()

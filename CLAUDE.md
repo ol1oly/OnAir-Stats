@@ -14,9 +14,11 @@ The core pipeline is fully wired end-to-end: audio → Deepgram → extractor �
 - `backend/transcriber.py` — Deepgram WebSocket streaming transcriber
 - `backend/extractor.py` — Fuzzy entity extraction (RapidFuzz n-gram); LLM mode partially wired
 - `backend/stats.py` — `StatsClient` with 45s in-memory cache; `get_player()` (skater + goalie) and `get_team()` (standings) fully implemented
-- `backend/server.py` — FastAPI app; `_on_transcript()` pipeline fully wired (transcript → extract → stats → broadcast)
-- `frontend/src/App.tsx` — root component; wires `useMicCapture` to `OverlayCanvas` + `MicHud`
-- `frontend/src/components/` — `OverlayCanvas`, `StatCard`, `GoalieCard`, `TeamCard`, `MicHud` (all built with Tailwind + slide-in animations)
+- `backend/server.py` — FastAPI app; `_on_transcript()` pipeline fully wired (transcript → extract → stats → broadcast); `POST /settings` syncs runtime config from frontend
+- `frontend/src/App.tsx` — hash-router shell (wouter); wraps app in `SettingsProvider`; routes `/` → LandingPage, `/overlay` → OverlayPage, `/settings` → SettingsPage
+- `frontend/src/contexts/SettingsContext.tsx` — 7 settings (model, language, fuzzy thresholds, cacheTtl, cardDisplayMs, maxCards); localStorage persistence; backend-bound keys auto-synced via `POST /settings`; frontend-only keys (cardDisplayMs, maxCards) not sent to backend
+- `frontend/src/pages/` — `LandingPage` (recording toggle + WS status + nav), `OverlayPage` (memoized OverlayCanvas), `SettingsPage` (6 SettingsSlider controls)
+- `frontend/src/components/` — `OverlayCanvas`, `StatCard`, `GoalieCard`, `TeamCard`, `MicHud`, `SettingsSlider` (all built with Tailwind + slide-in animations)
 - `frontend/src/hooks/` — `useOverlaySocket.ts` (WS hook with auto-reconnect), `useMicCapture.ts` (getUserMedia + MediaRecorder)
 - `frontend/src/types/payloads.ts` — full TypeScript payload types for all message shapes
 - Tests: `backend/tests/` (pytest) and `frontend/src/components/__tests__/` + `frontend/src/hooks/__tests__/` (Vitest + Testing Library)
@@ -110,7 +112,7 @@ Browser mic (getUserMedia + MediaRecorder)
 **Any tunable constant (timeout, threshold, URL, limit, interval, model name) MUST live in a config file — never hardcoded inline in a module.** This is a strict rule for this project.
 
 - **Backend:** `backend/config.py` — NHL API URLs, HTTP timeout, cache TTL, fuzzy matching thresholds, Deepgram model/language/reconnect settings. All plain Python constants grouped by domain. Secrets (API keys) stay in `.env`.
-- **Frontend:** `frontend/src/config.ts` — WebSocket URLs, card display timer, max visible cards, dedup window, mic timeslice, reconnect backoff. Exported TS constants. Tailwind visual classes (colors, sizes) stay inline in components.
+- **Frontend:** `frontend/src/config.ts` — WebSocket URLs, card display timer, max visible cards, dedup window, mic timeslice, reconnect backoff. Exported TS constants. `MAX_CARDS` and `CARD_DISPLAY_MS` are compile-time defaults only — runtime values come from `SettingsContext` (which reads localStorage). Tailwind visual classes (colors, sizes) stay inline in components.
 
 When adding a new feature or module, if it introduces any value that could reasonably be tuned in production (e.g. a polling interval, a retry count, a batch size, an API endpoint), add it to the appropriate config file with a descriptive comment — do not define it locally in the module.
 
@@ -122,7 +124,7 @@ When adding a new feature or module, if it introduces any value that could reaso
 | `transcriber.py` | Receives audio blobs from `WS /audio`, pipes to Deepgram; fires `on_transcript` for final segments only |
 | `extractor.py` | Dual-mode: `"llm"` (Claude/Gemini) or `"fuzzy"` (RapidFuzz n-gram). Returns `{ players: [], teams: [] }` |
 | `stats.py` | NHL API fetches with 45s in-memory cache. `players.json` maps names→IDs; `teams.json` maps names/aliases→abbreviations |
-| `server.py` | FastAPI app; `GET /` serves React build, `WS /audio` receives browser audio, `WS /ws` broadcasts stat JSON, `POST /debug/inject` manually injects a stat payload for testing |
+| `server.py` | FastAPI app; `GET /` serves React build, `WS /audio` receives browser audio, `WS /ws` broadcasts stat JSON, `POST /debug/inject` manually injects a stat payload for testing, `POST /settings` updates runtime config (model, language, fuzzy thresholds, cacheTtl) |
 | `trigger_resolver.py` | *(planned)* One-time LLM call to resolve NHL API endpoint + fields |
 | `trigger_store.py` | *(planned)* In-memory + JSON persistence for custom triggers |
 | `trigger_runner.py` | *(planned)* Runtime keyword matching + HTTP fetch + field extraction |
@@ -131,14 +133,19 @@ When adding a new feature or module, if it introduces any value that could reaso
 
 | File | Role |
 |---|---|
-| `hooks/useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 3s audio blobs as binary over `WS /audio` |
+| `contexts/SettingsContext.tsx` | 7 settings (model, language, fuzzyNgramThreshold, fuzzyPartialThreshold, cacheTtl, cardDisplayMs, maxCards); localStorage-persisted; backend-bound keys auto-POST to `/settings` on change |
+| `pages/LandingPage.tsx` | Control panel: recording start/stop toggle, WS connection indicator, nav links to `/overlay` and `/settings` |
+| `pages/OverlayPage.tsx` | Memoized `OverlayCanvas` wrapper; use `/#/overlay` as the OBS browser source URL |
+| `pages/SettingsPage.tsx` | Six `SettingsSlider` controls covering all 7 settings |
+| `hooks/useMicCapture.ts` | `getUserMedia` + `MediaRecorder`; sends 250ms audio blobs as binary over `WS /audio` |
 | `hooks/useOverlaySocket.ts` | WS hook; auto-reconnect with exponential backoff; parses `Envelope { v:1, payload: StatPayload }` |
 | `types/payloads.ts` | Full TS types: `PlayerPayload`, `GoaliePayload`, `TeamPayload`, `TriggerPayload`, `SystemPayload`, `StatPayload`, `Envelope` |
-| `components/OverlayCanvas.tsx` | Card queue manager (max 3 visible, 2s dedup window, bottom-left stacked); `?debug` URL param shows countdown |
-| `components/StatCard.tsx` | Skater stat card; slide-in, 8s auto-dismiss; goals=red, assists=blue |
+| `components/OverlayCanvas.tsx` | Card queue manager (max cards + display time from SettingsContext, 2s dedup window, bottom-left stacked); `?debug` URL param shows countdown |
+| `components/StatCard.tsx` | Skater stat card; slide-in, auto-dismiss; goals=red, assists=blue |
 | `components/GoalieCard.tsx` | Goalie stat card; teal accent |
 | `components/TeamCard.tsx` | Team stat card; gold/amber accent |
-| `components/MicHud.tsx` | Recording control HUD (top-right); WS connection indicator + start/stop button |
+| `components/SettingsSlider.tsx` | Discrete-stop range slider with label, description, and stop array |
+| `components/MicHud.tsx` | *(unused in routing)* Recording control HUD; mic capture is now handled in LandingPage |
 | `utils/initials.ts` | Derives 2-letter initials from a full name (used in card avatars) |
 | `TriggerCard.tsx` | *(planned)* Custom trigger card; purple/violet accent |
 | `TriggerBuilder.tsx` | *(planned)* UI to create custom triggers with LLM-resolved endpoint preview |
@@ -187,6 +194,13 @@ cd frontend && npm run dev   # http://localhost:5173
 ```
 `npm run build` is only needed when serving the frontend through the backend at port 8000.
 
+Or use the convenience script at the repo root:
+```bat
+dev.bat            # starts both backend and frontend in separate windows
+dev.bat backend    # backend only
+dev.bat build      # builds frontend, then starts backend only
+```
+
 **Injecting a stat payload without a microphone:**
 ```bash
 # Player by name
@@ -217,4 +231,4 @@ Whenever you create a new file in `docs/`, add an entry for it in `docs/README.m
 
 - Default: only `backend` runs; FastAPI serves the pre-built React `dist/` at `GET /`
 - `--profile full`: also starts a standalone nginx frontend on port 5173
-- OBS Browser Source: `http://localhost:8000` at 1920×1080; enable "Allow audio capture" in OBS source settings
+- OBS Browser Source: `http://localhost:8000/#/overlay` at 1920×1080 (the `/` route is the control panel, not the overlay); enable "Allow audio capture" in OBS source settings

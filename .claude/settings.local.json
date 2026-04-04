@@ -33,7 +33,18 @@
       "Bash(grep -E \"\\\\.tsx$\")",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([k for k in d.get\\('packages',{}\\) if 'wouter' in k]\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([k for k in d.get\\('packages',{}\\) if 'wouter' in k]\\)\")",
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py -v --tb=short)",
+      "Bash(npx vitest:*)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py::TestPostSettings -v --tb=short)",
+      "Bash(C:/Bureau/live_stats/backend/.venv/Scripts/python.exe -c \"import inspect; import websockets; help\\(websockets.connect\\)\")",
+      "Bash(C:/Bureau/live_stats/backend/.venv/Scripts/python.exe:*)",
+      "Bash(C:/Users/Olivier/AppData/Local/Programs/Python/Python312/python.exe:*)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/ -x -q)",
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/ -x -q)",
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py -q)"
     ]
   },
   "spinnerTipsEnabled": true,

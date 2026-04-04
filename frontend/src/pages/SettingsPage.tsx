@@ -3,9 +3,8 @@ import { useSettings } from '../contexts/SettingsContext'
 import { SettingsSlider } from '../components/SettingsSlider'
 
 const MODEL_STOPS = [
-  { label: 'Nova', value: 'nova' as const },
   { label: 'Nova-2', value: 'nova-2' as const },
-  { label: 'Whisper Large', value: 'whisper-large' as const },
+  { label: 'Nova-3', value: 'nova-3' as const },
 ]
 
 const LANGUAGE_STOPS = [
@@ -66,7 +65,7 @@ export function SettingsPage() {
       <main className="flex-1 px-6 py-8 max-w-xl mx-auto w-full flex flex-col gap-8">
         <SettingsSlider
           label="Deepgram Model"
-          description="Speech-to-text model. Nova-2 is fast and accurate. Whisper-large is slower but more precise."
+          description="Speech-to-text model for live transcription. Nova-2 is recommended."
           stops={MODEL_STOPS}
           value={settings.model}
           onChange={v => updateSetting('model', v)}

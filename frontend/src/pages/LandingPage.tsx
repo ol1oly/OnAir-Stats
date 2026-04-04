@@ -1,9 +1,13 @@
 import { Link } from 'wouter'
-import { WS_AUDIO_URL } from '../config'
-import { useMicCapture } from '../hooks/useMicCapture'
 
-export function LandingPage() {
-  const { start, stop, isRecording, isConnected } = useMicCapture(WS_AUDIO_URL)
+interface LandingPageProps {
+  start: () => Promise<void>
+  stop: () => void
+  isRecording: boolean
+  isConnected: boolean
+}
+
+export function LandingPage({ start, stop, isRecording, isConnected }: LandingPageProps) {
 
   return (
     <div className="w-screen h-screen bg-gray-950 flex flex-col items-center justify-center gap-8 text-white select-none">

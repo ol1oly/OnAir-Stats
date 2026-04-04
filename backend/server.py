@@ -38,7 +38,10 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 _ws_clients: set[WebSocket] = set()
+_audio_clients: set[WebSocket] = set()
 _transcriber: DeepgramTranscriber | None = None
+_transcriber_restarting: bool = False  # suppresses stop-on-disconnect during a settings restart
+_audio_init_blob: bytes | None = None  # WebM init segment; persisted across transcriber restarts
 _extractor = Extractor()
 _stats_client = StatsClient()
 _settings: dict = {
@@ -112,8 +115,10 @@ async def _handle_transcript(text: str) -> None:
 
 
 def _on_transcript(text: str, is_final: bool) -> None:
+   
     if is_final:
-        print(f"[transcript] {text}", flush=True)
+        label = "[FINAL]"
+        print(f"{label} {text}", flush=True)
         asyncio.create_task(_handle_transcript(text))
 
 
@@ -130,29 +135,68 @@ def _on_transcriber_error(message: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Lifespan: start / stop the shared Deepgram transcriber
+# Transcriber lifecycle helpers
+# ---------------------------------------------------------------------------
+
+async def _start_transcriber() -> None:
+    global _transcriber
+    api_key = os.environ.get("DEEPGRAM_API_KEY", "")
+    if not api_key:
+        print("[server] DEEPGRAM_API_KEY not set — transcriber disabled", file=sys.stderr, flush=True)
+        return
+    _transcriber = DeepgramTranscriber(
+        api_key=api_key,
+        on_transcript=_on_transcript,
+        on_ready=_on_transcriber_ready,
+        on_error=_on_transcriber_error,
+        model=_settings["model"],
+        language=_settings["language"],
+    )
+    if _audio_init_blob is not None:
+        _transcriber.set_reconnect_header(_audio_init_blob)
+    await _transcriber.start()
+    print("[server] Deepgram transcriber connected", flush=True)
+
+
+async def _stop_transcriber() -> None:
+    global _transcriber
+    if _transcriber is not None:
+        await _transcriber.stop()
+        _transcriber = None
+        print("[server] Deepgram transcriber stopped", flush=True)
+
+
+async def _restart_transcriber_and_reconnect() -> None:
+    """Stop the transcriber and evict all /audio clients.
+
+    Closing the browser's audio WebSocket (code 1012 — Service Restart) forces it to
+    reconnect with a fresh MediaRecorder, giving the new Deepgram session a clean WebM
+    stream from the beginning. The browser's auto-reconnect will call _start_transcriber()
+    via audio_endpoint once the first new client connects.
+    """
+    global _transcriber_restarting, _audio_init_blob
+    _transcriber_restarting = True
+    try:
+        await _stop_transcriber()
+        _audio_init_blob = None  # fresh init blob will arrive with the reconnecting browser
+        for ws in list(_audio_clients):
+            try:
+                await ws.close(code=1012)  # 1012 = Service Restart
+            except Exception:
+                pass
+    finally:
+        _transcriber_restarting = False
+
+
+# ---------------------------------------------------------------------------
+# Lifespan: start / stop shared resources
 # ---------------------------------------------------------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _transcriber
     await _stats_client.start()
-    api_key = os.environ.get("DEEPGRAM_API_KEY", "")
-    if api_key:
-        _transcriber = DeepgramTranscriber(
-            api_key=api_key,
-            on_transcript=_on_transcript,
-            on_ready=_on_transcriber_ready,
-            on_error=_on_transcriber_error,
-        )
-        await _transcriber.start()
-        print("[server] Deepgram transcriber connected", flush=True)
-    else:
-        print("[server] DEEPGRAM_API_KEY not set — transcriber disabled", file=sys.stderr, flush=True)
     yield
-    if _transcriber is not None:
-        await _transcriber.stop()
-        print("[server] Deepgram transcriber stopped", flush=True)
+    await _stop_transcriber()
     await _stats_client.close()
 
 
@@ -169,20 +213,30 @@ app = FastAPI(lifespan=lifespan)
 
 @app.websocket("/audio")
 async def audio_endpoint(websocket: WebSocket) -> None:
+    global _audio_init_blob
     await websocket.accept()
+    _audio_clients.add(websocket)
+    if len(_audio_clients) == 1:
+        await _start_transcriber()
     first_blob = True
     try:
         while True:
             blob = await websocket.receive_bytes()
             if first_blob and _transcriber is not None:
                 # Cache the WebM initialization segment so the transcriber can
-                # replay it to Deepgram on every reconnect.
+                # replay it to Deepgram on every reconnect, including after a
+                # settings-triggered restart.
+                _audio_init_blob = blob
                 _transcriber.set_reconnect_header(blob)
                 first_blob = False
             if _transcriber is not None:
                 await _transcriber.send_audio(blob)
     except WebSocketDisconnect:
         pass
+    finally:
+        _audio_clients.discard(websocket)
+        if not _audio_clients and not _transcriber_restarting:
+            await _stop_transcriber()
 
 
 # ---------------------------------------------------------------------------
@@ -285,17 +339,7 @@ async def update_settings(req: SettingsRequest) -> dict:
         _stats_client.cache_ttl = req.cache_ttl
 
     if needs_transcriber_restart and _transcriber is not None:
-        api_key = os.environ.get("DEEPGRAM_API_KEY", "")
-        await _transcriber.stop()
-        _transcriber = DeepgramTranscriber(
-            api_key=api_key,
-            on_transcript=_on_transcript,
-            on_ready=_on_transcriber_ready,
-            on_error=_on_transcriber_error,
-            model=_settings["model"],
-            language=_settings["language"],
-        )
-        await _transcriber.start()
+        await _restart_transcriber_and_reconnect()
 
     return {"ok": True}
 

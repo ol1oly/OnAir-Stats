@@ -16,7 +16,6 @@ Planning, tasks, and feature specs.
 
 ## Root files
 - `notes.md` — freeform notes and feature ideas not yet in the task list
-- `settings-design.md` — 3-page navigation, settings panel spec, local storage strategy, EN/FR transcriber debate
 
 ## features-ideas
 - `trigger-builder.md` — full spec for the custom trigger system (MVP + post-MVP)
