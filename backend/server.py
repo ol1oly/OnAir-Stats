@@ -15,6 +15,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Literal
 
+from config import (
+    DEEPGRAM_MODEL,
+    DEEPGRAM_LANGUAGE,
+    FUZZY_NGRAM_THRESHOLD,
+    FUZZY_PARTIAL_THRESHOLD,
+    NHL_CACHE_TTL,
+)
 from extractor import Extractor
 from stats import (
     StatsClient,
@@ -34,6 +41,13 @@ _ws_clients: set[WebSocket] = set()
 _transcriber: DeepgramTranscriber | None = None
 _extractor = Extractor()
 _stats_client = StatsClient()
+_settings: dict = {
+    "model": DEEPGRAM_MODEL,
+    "language": DEEPGRAM_LANGUAGE,
+    "fuzzy_ngram_threshold": FUZZY_NGRAM_THRESHOLD,
+    "fuzzy_partial_threshold": FUZZY_PARTIAL_THRESHOLD,
+    "cache_ttl": NHL_CACHE_TTL,
+}
 
 
 # ---------------------------------------------------------------------------
