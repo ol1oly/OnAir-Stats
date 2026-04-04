@@ -28,3 +28,4 @@ Planning, tasks, and feature specs.
 
 ## superpowers/plans
 - `2026-04-02-sessions.md` — step-by-step implementation plan for the sessions feature
+- `2026-04-03-settings.md` — step-by-step implementation plan for 3-page routing, SettingsContext, and POST /settings

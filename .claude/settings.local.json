@@ -29,7 +29,11 @@
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_stats.py tests/test_server.py -v)",
       "Bash(C:/Users/Olivier/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
       "Bash(cat \"C:/Bureau/live_stats/.superpowers/brainstorm/\"*/state/server-info)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\([k for k in d.get\\('packages',{}\\) if 'wouter' in k]\\)\")"
     ]
   },
   "spinnerTipsEnabled": true,
