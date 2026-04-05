@@ -236,19 +236,9 @@ The response lists each model with its supported languages. This could be fetche
 # note from olivier
  - will probably need to refactor the test directory to use a standardized structure for the tests.
  - will probably need to add more variables in the env file to be able to configure easily the time slide and other good parameters. I noticed a lot of hardcoded variable in the code, will need to have opus at max to analyze the repo and suggest places to be able to easily modify critical variables
- - the transcriber should start when a client connects and disconnect when no clients. 
- - nova and whisper do not work, set it to only nova-3 and nova2
- - make miccapture a component in the app, and pass the start and stop to the landing page
- function AppRoutes() {
-  const { start, stop, isRecording, isConnected } = useMicCapture(WS_AUDIO_URL)
-
-  return (
-    <Router hook={useHashLocation}>
-      <Route path="/">
-        {() => <LandingPage start={start} stop={stop} isRecording={isRecording} isConnected={isConnected} />}
-      </Route>
-      <Route path="/overlay" component={OverlayPage} />
-      <Route path="/settings" component={SettingsPage} />
-    </Router>
-  )
-}
+- there should be a "apply" button in the settings page to only update the settings when you click on it, not when you update one of the fields
+- when you want to go to the overlay, and that the connection is not set, it should either restrict you or ask you to start it first or start it automatically.
+- for now, since all clients use the same transcript, the sentences will probably make no sense. maybe keep a string for each socket that records their sentence for the trigger matching
+- for now, when someone speaks, everyone will receive the stats, but this will change when the sessions are implemented
+- will need to make tests for all the features that were developped today. 
+ 
