@@ -175,7 +175,7 @@ describe('useSettings — backend POST', () => {
     expect(body).toHaveProperty('cache_ttl')
   })
 
-  it('calls POST /settings when a backend-bound setting changes', async () => {
+  it('does NOT call POST /settings when a backend-bound setting changes (requires applySettings)', async () => {
     const { useSettings, SettingsProvider } = await getHook()
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       React.createElement(SettingsProvider, null, children)
@@ -184,7 +184,21 @@ describe('useSettings — backend POST', () => {
     fetchMock.mockClear()
     act(() => { result.current.updateSetting('language', 'fr') })
     await act(async () => { await Promise.resolve() })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('calls POST /settings when applySettings is called after a change', async () => {
+    const { useSettings, SettingsProvider } = await getHook()
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(SettingsProvider, null, children)
+    const { result } = renderHook(() => useSettings(), { wrapper })
+    await act(async () => { await Promise.resolve() })
+    fetchMock.mockClear()
+    act(() => { result.current.updateSetting('language', 'fr') })
+    await act(async () => { await result.current.applySettings() })
     expect(fetchMock).toHaveBeenCalledWith('/settings', expect.objectContaining({ method: 'POST' }))
+    const body = JSON.parse((fetchMock.mock.calls as any)[0][1].body as string)
+    expect(body.language).toBe('fr')
   })
 
   it('does NOT call POST /settings when a frontend-only setting changes', async () => {

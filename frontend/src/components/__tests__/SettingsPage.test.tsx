@@ -128,15 +128,23 @@ describe('SettingsPage — slider interaction', () => {
     )
   })
 
-  it('moving Language slider to index 1 triggers backend POST with language fr', async () => {
+  it('moving Language slider does not immediately POST; clicking Apply does', async () => {
     renderSettingsPage()
     await new Promise(r => setTimeout(r, 0))
     fetchMock.mockClear()
     const sliders = screen.getAllByRole('slider')
     fireEvent.change(sliders[1], { target: { value: '1' } })
     await new Promise(r => setTimeout(r, 0))
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /apply/i }))
+    await new Promise(r => setTimeout(r, 0))
     expect(fetchMock).toHaveBeenCalledWith('/settings', expect.objectContaining({ method: 'POST' }))
     const body = JSON.parse((fetchMock.mock.calls as any)[0][1].body as string)
     expect(body.language).toBe('fr')
+  })
+
+  it('renders Apply button', () => {
+    renderSettingsPage()
+    expect(screen.getByRole('button', { name: /apply/i })).toBeTruthy()
   })
 })

@@ -26,6 +26,13 @@
   animation: card-exit 0.2s ease-in forwards;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;           /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;                   /* Chrome, Safari, Edge */
+}
+
 body {
   margin: 0;
   background: transparent;

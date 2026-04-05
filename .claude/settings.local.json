@@ -44,7 +44,8 @@
       "Bash(C:/Users/Olivier/AppData/Local/Programs/Python/Python312/python.exe:*)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/ -x -q)",
       "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/ -x -q)",
-      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py -q)"
+      "Bash(backend/.venv/Scripts/python.exe -m pytest backend/tests/test_server.py -q)",
+      "Bash(npx tailwindcss:*)"
     ]
   },
   "spinnerTipsEnabled": true,
